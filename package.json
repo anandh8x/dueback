@@ -1,0 +1,37 @@
+{
+  "name": "dueback",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.1.2",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev:web": "pnpm --filter @dueback/web dev",
+    "dev:verifier": "bash scripts/run-verifier.sh",
+    "arc:deploy": "bash scripts/deploy-arc-testnet.sh",
+    "arc:verify": "node scripts/verify-arc-contracts.mjs",
+    "arc:smoke": "bash scripts/smoke-arc-testnet.sh",
+    "build": "pnpm -r --if-present build",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "lint": "eslint .",
+    "format:check": "prettier --check .",
+    "test": "pnpm -r --if-present test",
+    "contracts:test": "forge test --root contracts",
+    "go:test": "cd services/verifier && go test ./...",
+    "test:browser": "playwright test",
+    "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm contracts:test && pnpm go:test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@playwright/test": "^1.61.1",
+    "@types/node": "^24.0.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.0.0",
+    "typescript-eslint": "^8.0.0",
+    "viem": "^2.0.0"
+  }
+}
+
