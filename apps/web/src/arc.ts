@@ -58,6 +58,20 @@ const campaignComponents = [
   { name: "reclaimed", type: "bool" },
 ] as const;
 
+const campaignRequestComponents = [
+  { name: "organizationId", type: "bytes32" },
+  { name: "campaignReference", type: "bytes32" },
+  { name: "merkleRoot", type: "bytes32" },
+  { name: "policyHash", type: "bytes32" },
+  { name: "metadataHash", type: "bytes32" },
+  { name: "noticeHash", type: "bytes32" },
+  { name: "supersedesCampaignId", type: "bytes32" },
+  { name: "totalAmount", type: "uint256" },
+  { name: "opensAt", type: "uint64" },
+  { name: "closesAt", type: "uint64" },
+  { name: "recipientCount", type: "uint32" },
+] as const;
+
 const organizationComponents = [
   { name: "admin", type: "address" },
   { name: "reclaimAddress", type: "address" },
@@ -102,6 +116,13 @@ export const dueBackCampaignsAbi = [
     ],
     outputs: [],
   },
+  {
+    type: "function",
+    name: "createCampaign",
+    stateMutability: "payable",
+    inputs: [{ name: "request", type: "tuple", components: campaignRequestComponents }],
+    outputs: [{ name: "campaignId", type: "bytes32" }],
+  },
 ] as const;
 
 export const organizationRegistryAbi = [
@@ -140,6 +161,20 @@ export interface ClaimReadiness {
   proofValid: boolean;
   alreadyClaimed: boolean;
   claimOpen: boolean;
+}
+
+export interface FundedCampaignRequest {
+  organizationId: Hex;
+  campaignReference: Hex;
+  merkleRoot: Hex;
+  policyHash: Hex;
+  metadataHash: Hex;
+  noticeHash: Hex;
+  supersedesCampaignId: Hex;
+  totalAmount: bigint;
+  opensAt: bigint;
+  closesAt: bigint;
+  recipientCount: number;
 }
 
 export function campaignContractAddress(): Address | null {
@@ -278,9 +313,43 @@ export async function submitClaimPacket(
   return wallet.writeContract(request);
 }
 
+export async function submitFundedCampaign(
+  campaign: FundedCampaignRequest,
+  provider: EIP1193Provider,
+): Promise<Hash> {
+  const wallet = createWalletClient({
+    chain: arcTestnet,
+    transport: custom(provider),
+  });
+  try {
+    await wallet.switchChain({ id: arcTestnet.id });
+  } catch {
+    await wallet.addChain({ chain: arcTestnet });
+    await wallet.switchChain({ id: arcTestnet.id });
+  }
+  const [account] = await wallet.requestAddresses();
+  if (!account) throw new Error("No wallet account was selected.");
+
+  const { request } = await publicClient().simulateContract({
+    account,
+    address: requireCampaignContractAddress(),
+    abi: dueBackCampaignsAbi,
+    functionName: "createCampaign",
+    args: [campaign],
+    value: campaign.totalAmount,
+  });
+  return wallet.writeContract(request);
+}
+
 function publicClient() {
   return createPublicClient({
     chain: arcTestnet,
     transport: http(),
   });
+}
+
+function requireCampaignContractAddress(): Address {
+  const address = campaignContractAddress();
+  if (!address) throw new Error("Live Arc contracts are not configured in this build.");
+  return address;
 }
