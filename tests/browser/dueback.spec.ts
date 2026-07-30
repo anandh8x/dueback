@@ -14,16 +14,30 @@ test("explains the funded payout model without horizontal overflow", async ({ pa
   expect(dimensions.scrollWidth).toBe(dimensions.clientWidth);
 });
 
-test("verifies a public campaign record", async ({ page }) => {
+test("keeps illustrative campaign data explicitly labeled", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Verify a campaign" }).first().click();
 
   await expect(page.getByRole("heading", { name: "Verify before you claim." })).toBeVisible();
+  await page.getByRole("button", { name: "Try the clearly labeled demo campaign" }).click();
+
+  await expect(page.getByText("Demo campaign loaded.")).toBeVisible();
+  await expect(
+    page.getByText("Illustrative data only. No blockchain record was queried."),
+  ).toBeVisible();
+  await expect(page.getByText("$125,000.00")).toBeVisible();
+});
+
+test("does not verify malformed campaign input", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Verify a campaign" }).first().click();
   await page.getByLabel("Campaign ID or claim link").fill("0x9f3a");
   await page.getByRole("button", { name: "Verify", exact: true }).click();
 
-  await expect(page.getByText("Your campaign record checks out.")).toBeVisible();
-  await expect(page.getByText("$125,000.00")).toBeVisible();
+  await expect(
+    page.getByText("Enter a 32-byte campaign ID or a claim link containing one."),
+  ).toBeVisible();
+  await expect(page.getByText("Live campaign state loaded from Arc.")).not.toBeVisible();
 });
 
 test("builds allocation commitments locally", async ({ page }) => {
