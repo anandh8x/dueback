@@ -22,9 +22,15 @@ func main() {
 	config := attestor.Config{
 		RPCURL:          required("DUEBACK_ARC_RPC_URL"),
 		RegistryAddress: required("DUEBACK_ORGANIZATION_REGISTRY_ADDRESS"),
-		Account:         strings.TrimSpace(os.Getenv("DUEBACK_FOUNDRY_ACCOUNT")),
-		KeystorePath:    strings.TrimSpace(os.Getenv("DUEBACK_KEYSTORE_PATH")),
-		PasswordFile:    required("DUEBACK_PASSWORD_FILE"),
+		Account: firstNonEmpty(
+			os.Getenv("DUEBACK_VERIFIER_FOUNDRY_ACCOUNT"),
+			os.Getenv("DUEBACK_FOUNDRY_ACCOUNT"),
+		),
+		KeystorePath: firstNonEmpty(
+			os.Getenv("DUEBACK_VERIFIER_KEYSTORE_PATH"),
+			os.Getenv("DUEBACK_KEYSTORE_PATH"),
+		),
+		PasswordFile: required("DUEBACK_PASSWORD_FILE"),
 	}
 	signer, err := attestor.NewCastSigner(config)
 	if err != nil {
@@ -94,4 +100,13 @@ func envInt(name string, fallback int) int {
 		log.Fatalf("%s must be a positive integer", name)
 	}
 	return parsed
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
 }

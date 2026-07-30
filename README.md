@@ -43,6 +43,7 @@ Requirements:
 
 - Node.js 22 or newer
 - pnpm 11
+- Go 1.26 or newer
 - Foundry for contract commands
 
 ```bash
@@ -96,6 +97,24 @@ pnpm arc:verify
 ```
 
 The guarded deployment command confirms the Arc Testnet chain ID, checks the deployer balance, verifies both constructor relationships, checks deployed bytecode, writes a public deployment manifest, and updates local frontend addresses.
+
+## Run the domain verifier
+
+The verifier creates one-time DNS TXT challenges and signs domain-control attestations accepted by `OrganizationRegistry`. Use a separate, low-balance Foundry account for the attestor instead of the deployment account:
+
+```text
+DUEBACK_VERIFIER_FOUNDRY_ACCOUNT=your-dedicated-attestor
+DUEBACK_VERIFIER_ALLOWED_ORIGIN=http://localhost:5173
+DUEBACK_CHALLENGE_STORE_PATH=.dueback-data/challenges.json
+DUEBACK_MAX_CHALLENGES=10000
+DUEBACK_VERIFY_TIMEOUT_SECONDS=20
+```
+
+```bash
+pnpm dev:verifier
+```
+
+The challenge store is written atomically with owner-only permissions so challenges and replay protection survive a restart. The public challenge endpoint also limits requests per client address. For a multi-instance deployment, place the verifier behind one routing instance or replace the file store with a shared transactional store before scaling horizontally.
 
 ## Contracts
 
