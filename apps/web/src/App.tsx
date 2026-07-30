@@ -68,9 +68,7 @@ function Header({ onView }: { onView: (view: View) => void }) {
   return (
     <header className="site-header">
       <button className="wordmark" onClick={() => onView("home")} aria-label="DueBack home">
-        <span className="wordmark-mark" aria-hidden="true">
-          D
-        </span>
+        <BrandMark />
         DueBack
       </button>
       <nav aria-label="Primary navigation">
@@ -83,6 +81,18 @@ function Header({ onView }: { onView: (view: View) => void }) {
         Open app <Arrow />
       </button>
     </header>
+  );
+}
+
+function BrandMark() {
+  return (
+    <span className="wordmark-mark" aria-hidden="true">
+      <svg viewBox="0 0 32 32" role="presentation">
+        <path className="brand-return" d="M7 24V7h7c7.1 0 12 4.7 12 11.2 0 4.5-2.2 7.6-5.8 9" />
+        <path className="brand-arrow" d="M17.5 12.5 12 18l5.5 5.5M12.5 18H21" />
+        <circle className="brand-endpoint" cx="19.6" cy="27.5" r="1.65" />
+      </svg>
+    </span>
   );
 }
 
@@ -391,7 +401,7 @@ function WorkspaceHeader({ title, onClose }: { title: string; onClose: () => voi
   return (
     <header className="workspace-header">
       <button className="wordmark" onClick={onClose}>
-        <span className="wordmark-mark">D</span>
+        <BrandMark />
         DueBack
       </button>
       <span>{title}</span>
