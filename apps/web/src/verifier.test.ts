@@ -1,9 +1,17 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDomainChallenge, verifyDomainChallenge } from "./verifier";
 
 const admin = "0x99066fBc97557490fA794F750630bb41733D1004";
 
 describe("domain verifier client", () => {
+  beforeEach(() => {
+    vi.stubEnv("VITE_VERIFIER_API_URL", "http://127.0.0.1:8787");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("creates and validates a DNS challenge response", async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
       Response.json(
