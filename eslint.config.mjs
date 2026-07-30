@@ -10,6 +10,7 @@ export default tseslint.config(
       "contracts/out/**",
       "contracts/cache/**",
       "contracts/broadcast/**",
+      ".vercel/**",
     ],
   },
   eslint.configs.recommended,
