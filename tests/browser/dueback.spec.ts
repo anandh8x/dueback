@@ -40,6 +40,19 @@ test("does not verify malformed campaign input", async ({ page }) => {
   await expect(page.getByText("Live campaign state loaded from Arc.")).not.toBeVisible();
 });
 
+test("validates bearer claim packets before any wallet action", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Verify a campaign" }).first().click();
+  await page.getByRole("button", { name: "Claim packet" }).click();
+
+  await expect(page.getByText("This packet contains a bearer secret.")).toBeVisible();
+  await page.getByLabel("Claim packet JSON").fill("{");
+  await page.getByRole("button", { name: "Check packet on Arc" }).click();
+
+  await expect(page.getByText("Claim packet is not valid JSON")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Connect wallet and claim" })).not.toBeVisible();
+});
+
 test("builds allocation commitments locally", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Create a funded payout" }).first().click();
