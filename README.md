@@ -103,6 +103,14 @@ The guarded deployment command confirms the Arc Testnet chain ID, checks the dep
 
 `DueBackCampaigns` creates exactly funded campaigns, validates private claim packets against immutable Merkle roots, prevents duplicate claims, pays recipients, and returns unclaimed funds to the committed reclaim address after closing.
 
+Arc Testnet deployments:
+
+- `OrganizationRegistry`: [`0x5028C830C3260fE5604B7F39eB118a1F3dBe34f5`](https://testnet.arcscan.app/address/0x5028C830C3260fE5604B7F39eB118a1F3dBe34f5)
+- `DueBackCampaigns`: [`0x111f01A0ee61C7A9D779c2C9f9b91cadD7d5a0ec`](https://testnet.arcscan.app/address/0x111f01A0ee61C7A9D779c2C9f9b91cadD7d5a0ec)
+- Deployer and testnet domain attestor: [`0x99066fBc97557490fA794F750630bb41733D1004`](https://testnet.arcscan.app/address/0x99066fBc97557490fA794F750630bb41733D1004)
+
+Both contract sources are verified on ArcScan.
+
 ## Status
 
 DueBack is an independent Arc Testnet prototype. Use testnet tokens only.
