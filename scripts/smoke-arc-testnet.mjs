@@ -118,10 +118,10 @@ const creation = send(
   campaigns,
   "createCampaign((bytes32,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32,uint256,uint64,uint64,uint32))",
   [`(${request})`],
-  ["--value", amount],
+  ["--value", `${amount}wei`],
 );
 
-await waitUntil(opensAt);
+await waitUntil(opensAt + 3);
 const claim = send(campaigns, "claim(bytes32,uint256,bytes32,uint256,bytes32,bytes32[])", [
   campaignId,
   "0",
