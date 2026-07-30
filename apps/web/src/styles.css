@@ -1213,6 +1213,41 @@ button {
   color: var(--coral);
 }
 
+.campaign-details {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px 24px;
+  margin-top: 44px;
+  padding: 28px;
+  border: 1px solid var(--line);
+  background: rgba(3, 7, 33, 0.3);
+}
+
+.campaign-details label {
+  color: #aeb8dc;
+  font-family: "DM Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.campaign-details input {
+  width: 100%;
+  margin-top: 10px;
+  border: 0;
+  border-bottom: 1px solid rgba(210, 220, 255, 0.35);
+  padding: 10px 0;
+  color: #fff;
+  outline: 0;
+  background: transparent;
+  font-family: "Inter", sans-serif;
+  font-size: 14px;
+}
+
+.campaign-details input:focus {
+  border-color: #9aabff;
+}
+
 .builder-grid {
   display: grid;
   grid-template-columns: 1.15fr 0.85fr;
@@ -1317,6 +1352,27 @@ button {
   color: #fff;
 }
 
+.funding-action {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.funding-action p {
+  margin: 0;
+  color: #98a4ce;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.funding-action p b {
+  color: #fff;
+}
+
+.funding-action .transaction-link {
+  display: block;
+}
+
 .button.full {
   width: 100%;
   margin-top: 24px;
@@ -1366,6 +1422,10 @@ button {
   .workspace-result,
   .builder-grid,
   .claim-packet-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .campaign-details {
     grid-template-columns: 1fr;
   }
 

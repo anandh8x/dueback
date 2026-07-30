@@ -5,6 +5,7 @@ import {
   createDeterministicRandomSource,
   formatArcAmount,
   generateDistribution,
+  hashJson,
   organizationIdFor,
   parseAllocationCsv,
   parseClaimPacketJson,
@@ -18,6 +19,7 @@ import {
   inspectClaimPacket,
   readLiveCampaign,
   submitClaimPacket,
+  submitFundedCampaign,
   transactionExplorerUrl,
   type ClaimReadiness,
   type LiveCampaign,
@@ -631,9 +633,15 @@ function ClaimPacketPanel() {
 }
 
 function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
+  const [domain, setDomain] = useState("communityrefunds.org");
+  const [campaignReference, setCampaignReference] = useState("spring-membership-refunds");
+  const [policy, setPolicy] = useState("Recipients listed in the approved refund allocation.");
+  const [notice, setNotice] = useState("Claims remain open for 30 days after funding.");
   const [csv, setCsv] = useState(sampleCsv);
   const [distribution, setDistribution] = useState<GeneratedDistribution | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [funding, setFunding] = useState(false);
+  const [fundingTransaction, setFundingTransaction] = useState<Hash | null>(null);
   const preview = useMemo(() => {
     try {
       return parseAllocationCsv(csv);
@@ -644,8 +652,8 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
 
   const generate = () => {
     try {
-      const organizationId = organizationIdFor("communityrefunds.org");
-      const reference = campaignReferenceFor("spring-membership-refunds");
+      const organizationId = organizationIdFor(domain);
+      const reference = campaignReferenceFor(campaignReference);
       const campaignId = campaignIdFor(organizationId, reference);
       setDistribution(
         generateDistribution(
@@ -659,6 +667,58 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
       setDistribution(null);
       setError(cause instanceof Error ? cause.message : "Could not validate allocation");
     }
+  };
+
+  const fund = async () => {
+    if (!distribution) return;
+    const provider = (window as Window & { ethereum?: EIP1193Provider }).ethereum;
+    if (!provider) {
+      setError("Install or open an EVM wallet to fund this campaign.");
+      return;
+    }
+    setFunding(true);
+    setError(null);
+    setFundingTransaction(null);
+    try {
+      const organizationId = organizationIdFor(domain);
+      const reference = campaignReferenceFor(campaignReference);
+      if (campaignIdFor(organizationId, reference) !== distribution.campaignId) {
+        throw new Error("Campaign details changed. Generate the commitments again.");
+      }
+      const now = BigInt(Math.floor(Date.now() / 1000));
+      setFundingTransaction(
+        await submitFundedCampaign(
+          {
+            organizationId,
+            campaignReference: reference,
+            merkleRoot: distribution.merkleRoot,
+            policyHash: hashJson({ policy }),
+            metadataHash: hashJson({
+              schemaVersion: 1,
+              campaignReference,
+              recipientCount: distribution.recipientCount,
+            }),
+            noticeHash: hashJson({ notice }),
+            supersedesCampaignId: `0x${"0".repeat(64)}`,
+            totalAmount: distribution.totalAmount,
+            opensAt: now + 300n,
+            closesAt: now + 30n * 86_400n,
+            recipientCount: distribution.recipientCount,
+          },
+          provider,
+        ),
+      );
+    } catch (cause) {
+      setError(readableError(cause));
+    } finally {
+      setFunding(false);
+    }
+  };
+
+  const invalidate = () => {
+    setDistribution(null);
+    setFundingTransaction(null);
+    setError(null);
   };
 
   return (
@@ -680,13 +740,46 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
             <li>Distribute</li>
           </ol>
         </div>
+        <div className="campaign-details">
+          <label>
+            Organization domain
+            <input
+              value={domain}
+              onChange={(event) => {
+                setDomain(event.target.value);
+                invalidate();
+              }}
+            />
+          </label>
+          <label>
+            Campaign reference
+            <input
+              value={campaignReference}
+              onChange={(event) => {
+                setCampaignReference(event.target.value);
+                invalidate();
+              }}
+            />
+          </label>
+          <label>
+            Eligibility policy
+            <input value={policy} onChange={(event) => setPolicy(event.target.value)} />
+          </label>
+          <label>
+            Recipient notice
+            <input value={notice} onChange={(event) => setNotice(event.target.value)} />
+          </label>
+        </div>
         <div className="builder-grid">
           <div className="csv-editor">
             <label htmlFor="allocation">Allocation CSV</label>
             <textarea
               id="allocation"
               value={csv}
-              onChange={(event) => setCsv(event.target.value)}
+              onChange={(event) => {
+                setCsv(event.target.value);
+                invalidate();
+              }}
             />
             <div className="privacy-line">
               <span>Local browser</span>
@@ -751,6 +844,31 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
                   >
                     Export private claim packets
                   </button>
+                </div>
+                <div className="funding-action">
+                  <p>
+                    Your wallet must be an authorized issuer for <b>{domain}</b>. Funding locks the
+                    exact total on Arc.
+                  </p>
+                  <button
+                    className="button button-primary full"
+                    onClick={() => void fund()}
+                    disabled={funding}
+                  >
+                    {funding
+                      ? "Confirm funding in wallet..."
+                      : `Connect wallet and fund ${formatMoney(distribution.totalAmount)} USDC`}
+                  </button>
+                  {fundingTransaction ? (
+                    <a
+                      className="transaction-link"
+                      href={transactionExplorerUrl(fundingTransaction)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Campaign submitted. View on ArcScan <Arrow />
+                    </a>
+                  ) : null}
                 </div>
               </>
             ) : null}
