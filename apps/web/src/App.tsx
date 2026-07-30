@@ -707,11 +707,39 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
               </tbody>
             </table>
             {distribution ? (
-              <div className="distribution-summary">
-                <span>{distribution.recipientCount} recipients</span>
-                <strong>{formatMoney(distribution.totalAmount)} USDC</strong>
-                <code>{distribution.merkleRoot.slice(0, 20)}...</code>
-              </div>
+              <>
+                <div className="distribution-summary">
+                  <span>{distribution.recipientCount} recipients</span>
+                  <strong>{formatMoney(distribution.totalAmount)} USDC</strong>
+                  <code>{distribution.merkleRoot.slice(0, 20)}...</code>
+                </div>
+                <div className="export-actions">
+                  <button
+                    onClick={() =>
+                      downloadJson("dueback-public-commitments.json", {
+                        schemaVersion: 1,
+                        campaignId: distribution.campaignId,
+                        merkleRoot: distribution.merkleRoot,
+                        totalAmount: distribution.totalAmount.toString(),
+                        recipientCount: distribution.recipientCount,
+                      })
+                    }
+                  >
+                    Download public commitments
+                  </button>
+                  <button
+                    onClick={() =>
+                      downloadJson("dueback-private-claim-packets.json", {
+                        schemaVersion: 1,
+                        campaignId: distribution.campaignId,
+                        claims: distribution.claims,
+                      })
+                    }
+                  >
+                    Export private claim packets
+                  </button>
+                </div>
+              </>
             ) : null}
             {error ? <p className="form-error">{error}</p> : null}
             <button className="button button-primary full" onClick={generate}>
@@ -749,4 +777,14 @@ function readableError(cause: unknown): string {
     return "No DueBack campaign was found for that ID on the configured Arc contract.";
   }
   return cause.message;
+}
+
+function downloadJson(filename: string, value: unknown): void {
+  const blob = new Blob([JSON.stringify(value, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
 }
