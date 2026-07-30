@@ -14,10 +14,10 @@
     "arc:verify": "node scripts/verify-arc-contracts.mjs",
     "arc:smoke": "bash scripts/smoke-arc-testnet.sh",
     "build": "pnpm -r --if-present build",
-    "typecheck": "pnpm -r --if-present typecheck",
+    "typecheck": "pnpm -r --if-present typecheck && tsc -p api/tsconfig.json --noEmit",
     "lint": "eslint .",
     "format:check": "prettier --check .",
-    "test": "pnpm -r --if-present test",
+    "test": "pnpm -r --if-present test && vitest run api",
     "contracts:test": "forge test --root contracts",
     "go:test": "cd services/verifier && GOCACHE=${GOCACHE:-/tmp/dueback-go-cache} go test ./...",
     "test:browser": "playwright test",
@@ -31,6 +31,7 @@
     "prettier": "^3.0.0",
     "typescript": "^5.0.0",
     "typescript-eslint": "^8.0.0",
-    "viem": "^2.0.0"
+    "viem": "^2.0.0",
+    "vitest": "^3.2.7"
   }
 }

@@ -57,8 +57,7 @@ export async function verifyDomainChallenge(
 }
 
 async function request(path: string, init: RequestInit, fetcher: Fetcher): Promise<unknown> {
-  const baseURL = import.meta.env.VITE_VERIFIER_API_URL?.replace(/\/$/, "");
-  if (!baseURL) throw new Error("Domain verifier is not configured in this build.");
+  const baseURL = (import.meta.env.VITE_VERIFIER_API_URL || "/api").replace(/\/$/, "");
   const response = await fetcher(`${baseURL}${path}`, init);
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {

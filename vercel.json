@@ -1,0 +1,11 @@
+{
+  "buildCommand": "pnpm --filter @dueback/web build",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "outputDirectory": "apps/web/dist",
+  "framework": "vite",
+  "functions": {
+    "api/**/*.ts": {
+      "maxDuration": 20
+    }
+  }
+}
