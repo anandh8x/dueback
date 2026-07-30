@@ -621,7 +621,7 @@ function ClaimPacketPanel() {
               onClick={() => void claim()}
               disabled={!ready || submitting}
             >
-              {submitting ? "Confirm in wallet..." : "Connect wallet and claim"}
+              {submitting ? "Waiting for Arc confirmation..." : "Connect wallet and claim"}
             </button>
             {transactionHash ? (
               <a
@@ -630,7 +630,7 @@ function ClaimPacketPanel() {
                 target="_blank"
                 rel="noreferrer"
               >
-                Transaction submitted. View on ArcScan <Arrow />
+                Claim confirmed. View on ArcScan <Arrow />
               </a>
             ) : null}
           </>
@@ -902,9 +902,9 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
                     disabled={verificationBusy || registrationTransaction !== null}
                   >
                     {registrationTransaction
-                      ? "Organization submitted"
+                      ? "Organization confirmed"
                       : verificationBusy
-                        ? "Confirm in wallet..."
+                        ? "Waiting for Arc confirmation..."
                         : "Register organization on Arc"}
                   </button>
                 )}
@@ -915,7 +915,7 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
                     target="_blank"
                     rel="noreferrer"
                   >
-                    Registration submitted. View on ArcScan <Arrow />
+                    Registration confirmed. View on ArcScan <Arrow />
                   </a>
                 ) : null}
               </>
@@ -1060,7 +1060,7 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
                     disabled={funding}
                   >
                     {funding
-                      ? "Confirm funding in wallet..."
+                      ? "Waiting for Arc confirmation..."
                       : `Connect wallet and fund ${formatMoney(
                           preparedCampaign.distribution.totalAmount,
                         )} USDC`}
@@ -1072,7 +1072,7 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
                       target="_blank"
                       rel="noreferrer"
                     >
-                      Campaign submitted. View on ArcScan <Arrow />
+                      Campaign confirmed. View on ArcScan <Arrow />
                     </a>
                   ) : null}
                 </div>

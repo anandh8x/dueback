@@ -331,7 +331,7 @@ export async function submitClaimPacket(
       packet.proof,
     ],
   });
-  return wallet.writeContract(request);
+  return confirmTransaction(await wallet.writeContract(request));
 }
 
 export async function submitFundedCampaign(
@@ -359,7 +359,7 @@ export async function submitFundedCampaign(
     args: [campaign],
     value: campaign.totalAmount,
   });
-  return wallet.writeContract(request);
+  return confirmTransaction(await wallet.writeContract(request));
 }
 
 export async function selectedWalletAddress(provider: EIP1193Provider): Promise<Address> {
@@ -403,7 +403,7 @@ export async function submitOrganizationRegistration(
     functionName: "registerOrganization",
     args: [domain, displayName, account, validUntil, attestation.nonce, attestation.signature],
   });
-  return wallet.writeContract(request);
+  return confirmTransaction(await wallet.writeContract(request));
 }
 
 function publicClient() {
@@ -411,6 +411,17 @@ function publicClient() {
     chain: arcTestnet,
     transport: http(),
   });
+}
+
+async function confirmTransaction(hash: Hash): Promise<Hash> {
+  const receipt = await publicClient().waitForTransactionReceipt({
+    hash,
+    confirmations: 1,
+  });
+  if (receipt.status !== "success") {
+    throw new Error("The Arc transaction reverted before confirmation.");
+  }
+  return receipt.transactionHash;
 }
 
 function requireCampaignContractAddress(): Address {
