@@ -26,6 +26,7 @@ import {
   type LiveCampaign,
   type OrganizationAttestation,
 } from "./arc";
+import { readableError } from "./errors";
 import { createDomainChallenge, verifyDomainChallenge, type DomainChallenge } from "./verifier";
 
 type View = "home" | "verify" | "organize";
@@ -684,7 +685,9 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
     setRegistrationTransaction(null);
     try {
       const admin = await selectedWalletAddress(provider);
-      setDomainChallenge(await createDomainChallenge(domain, admin));
+      const challenge = await createDomainChallenge(domain, admin);
+      setDomain(challenge.domain);
+      setDomainChallenge(challenge);
     } catch (cause) {
       setError(readableError(cause));
     } finally {
@@ -706,7 +709,7 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
   };
 
   const registerOrganization = async () => {
-    if (!domainAttestation) return;
+    if (!domainAttestation || !domainChallenge) return;
     const provider = (window as Window & { ethereum?: EIP1193Provider }).ethereum;
     if (!provider) {
       setError("Install or open the wallet that requested this attestation.");
@@ -716,7 +719,12 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
     setError(null);
     try {
       setRegistrationTransaction(
-        await submitOrganizationRegistration(domain, displayName, domainAttestation, provider),
+        await submitOrganizationRegistration(
+          domainChallenge.domain,
+          displayName,
+          domainAttestation,
+          provider,
+        ),
       );
     } catch (cause) {
       setError(readableError(cause));
@@ -1036,14 +1044,6 @@ function formatMoney(value: bigint): string {
   const formatted = formatArcAmount(value);
   const [whole, fraction = ""] = formatted.split(".");
   return `${BigInt(whole ?? "0").toLocaleString("en-US")}.${fraction.padEnd(2, "0")}`;
-}
-
-function readableError(cause: unknown): string {
-  if (!(cause instanceof Error)) return "Could not read this campaign from Arc.";
-  if (cause.message.includes("CampaignNotFound") || cause.message.includes("execution reverted")) {
-    return "No DueBack campaign was found for that ID on the configured Arc contract.";
-  }
-  return cause.message;
 }
 
 function downloadJson(filename: string, value: unknown): void {

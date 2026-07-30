@@ -19,7 +19,8 @@ describe("domain verifier client", () => {
       ),
     );
 
-    const challenge = await createDomainChallenge("refunds.example", admin, fetcher);
+    const challenge = await createDomainChallenge("Refunds.Example.", admin, fetcher);
+    expect(challenge.domain).toBe("refunds.example");
     expect(challenge.dnsName).toBe("_dueback.refunds.example");
     expect(fetcher).toHaveBeenCalledWith(
       "http://127.0.0.1:8787/v1/challenges",
