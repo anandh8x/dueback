@@ -18,12 +18,16 @@ import {
   featuredCampaignId,
   inspectClaimPacket,
   readLiveCampaign,
+  selectedWalletAddress,
   submitClaimPacket,
   submitFundedCampaign,
+  submitOrganizationRegistration,
   transactionExplorerUrl,
   type ClaimReadiness,
   type LiveCampaign,
+  type OrganizationAttestation,
 } from "./arc";
+import { createDomainChallenge, verifyDomainChallenge, type DomainChallenge } from "./verifier";
 
 type View = "home" | "verify" | "organize";
 
@@ -634,6 +638,7 @@ function ClaimPacketPanel() {
 
 function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
   const [domain, setDomain] = useState("communityrefunds.org");
+  const [displayName, setDisplayName] = useState("Community Refunds Foundation");
   const [campaignReference, setCampaignReference] = useState("spring-membership-refunds");
   const [policy, setPolicy] = useState("Recipients listed in the approved refund allocation.");
   const [notice, setNotice] = useState("Claims remain open for 30 days after funding.");
@@ -642,6 +647,10 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [funding, setFunding] = useState(false);
   const [fundingTransaction, setFundingTransaction] = useState<Hash | null>(null);
+  const [domainChallenge, setDomainChallenge] = useState<DomainChallenge | null>(null);
+  const [domainAttestation, setDomainAttestation] = useState<OrganizationAttestation | null>(null);
+  const [verificationBusy, setVerificationBusy] = useState(false);
+  const [registrationTransaction, setRegistrationTransaction] = useState<Hash | null>(null);
   const preview = useMemo(() => {
     try {
       return parseAllocationCsv(csv);
@@ -666,6 +675,60 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
     } catch (cause) {
       setDistribution(null);
       setError(cause instanceof Error ? cause.message : "Could not validate allocation");
+    }
+  };
+
+  const startDomainVerification = async () => {
+    const provider = (window as Window & { ethereum?: EIP1193Provider }).ethereum;
+    if (!provider) {
+      setError("Install or open an EVM wallet to verify an organization.");
+      return;
+    }
+    setVerificationBusy(true);
+    setError(null);
+    setDomainChallenge(null);
+    setDomainAttestation(null);
+    setRegistrationTransaction(null);
+    try {
+      const admin = await selectedWalletAddress(provider);
+      setDomainChallenge(await createDomainChallenge(domain, admin));
+    } catch (cause) {
+      setError(readableError(cause));
+    } finally {
+      setVerificationBusy(false);
+    }
+  };
+
+  const checkDomainVerification = async () => {
+    if (!domainChallenge) return;
+    setVerificationBusy(true);
+    setError(null);
+    try {
+      setDomainAttestation(await verifyDomainChallenge(domainChallenge.id));
+    } catch (cause) {
+      setError(readableError(cause));
+    } finally {
+      setVerificationBusy(false);
+    }
+  };
+
+  const registerOrganization = async () => {
+    if (!domainAttestation) return;
+    const provider = (window as Window & { ethereum?: EIP1193Provider }).ethereum;
+    if (!provider) {
+      setError("Install or open the wallet that requested this attestation.");
+      return;
+    }
+    setVerificationBusy(true);
+    setError(null);
+    try {
+      setRegistrationTransaction(
+        await submitOrganizationRegistration(domain, displayName, domainAttestation, provider),
+      );
+    } catch (cause) {
+      setError(readableError(cause));
+    } finally {
+      setVerificationBusy(false);
     }
   };
 
@@ -740,13 +803,93 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
             <li>Distribute</li>
           </ol>
         </div>
+        <div className="organization-onboarding">
+          <div>
+            <span className="section-kicker">Organization identity</span>
+            <h2>Verify the domain before funding.</h2>
+            <p>
+              A one-time DNS record proves control of the organization domain. The connected wallet
+              becomes its first authorized issuer and reclaim address.
+            </p>
+          </div>
+          <div className="onboarding-action">
+            {!domainChallenge ? (
+              <button
+                className="button button-primary full"
+                onClick={() => void startDomainVerification()}
+                disabled={verificationBusy}
+              >
+                {verificationBusy ? "Connecting..." : "Connect wallet and request DNS challenge"}
+              </button>
+            ) : (
+              <>
+                <dl>
+                  <div>
+                    <dt>TXT name</dt>
+                    <dd>
+                      <code>{domainChallenge.dnsName}</code>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>TXT value</dt>
+                    <dd>
+                      <code>{domainChallenge.dnsValue}</code>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Expires</dt>
+                    <dd>{new Date(domainChallenge.expiresAt).toLocaleTimeString()}</dd>
+                  </div>
+                </dl>
+                {!domainAttestation ? (
+                  <button
+                    className="button button-primary full"
+                    onClick={() => void checkDomainVerification()}
+                    disabled={verificationBusy}
+                  >
+                    {verificationBusy ? "Checking DNS..." : "Check DNS and issue attestation"}
+                  </button>
+                ) : (
+                  <button
+                    className="button button-primary full"
+                    onClick={() => void registerOrganization()}
+                    disabled={verificationBusy || registrationTransaction !== null}
+                  >
+                    {registrationTransaction
+                      ? "Organization submitted"
+                      : verificationBusy
+                        ? "Confirm in wallet..."
+                        : "Register organization on Arc"}
+                  </button>
+                )}
+                {registrationTransaction ? (
+                  <a
+                    className="transaction-link"
+                    href={transactionExplorerUrl(registrationTransaction)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Registration submitted. View on ArcScan <Arrow />
+                  </a>
+                ) : null}
+              </>
+            )}
+          </div>
+        </div>
         <div className="campaign-details">
+          <label>
+            Organization name
+            <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
+          </label>
           <label>
             Organization domain
             <input
               value={domain}
               onChange={(event) => {
                 setDomain(event.target.value);
+                setDomainChallenge(null);
+                setDomainAttestation(null);
+                setRegistrationTransaction(null);
                 invalidate();
               }}
             />
