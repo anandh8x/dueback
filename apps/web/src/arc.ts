@@ -362,6 +362,13 @@ export async function submitFundedCampaign(
   return wallet.writeContract(request);
 }
 
+export async function selectedWalletAddress(provider: EIP1193Provider): Promise<Address> {
+  const wallet = createWalletClient({ transport: custom(provider) });
+  const [account] = await wallet.requestAddresses();
+  if (!account) throw new Error("No wallet account was selected.");
+  return account;
+}
+
 export async function submitOrganizationRegistration(
   domain: string,
   displayName: string,
