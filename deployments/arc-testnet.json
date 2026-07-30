@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "network": "Arc Testnet",
+  "chainId": 5042002,
+  "rpcUrl": "https://rpc.testnet.arc.network",
+  "explorer": "https://testnet.arcscan.app",
+  "nativeGasToken": {
+    "name": "USDC",
+    "symbol": "USDC",
+    "decimals": 18
+  },
+  "compiler": {
+    "version": "0.8.30",
+    "optimizer": true,
+    "optimizerRuns": 200
+  },
+  "deployedAt": "2026-07-30T11:57:55.150Z",
+  "deployer": "0x99066fBc97557490fA794F750630bb41733D1004",
+  "domainAttestor": "0x99066fBc97557490fA794F750630bb41733D1004",
+  "reclaimChangeDelay": 86400,
+  "contracts": {
+    "OrganizationRegistry": {
+      "address": "0x5028C830C3260fE5604B7F39eB118a1F3dBe34f5",
+      "transactionHash": "0x45cd5316f4705634972c14aa9018afed874dd0b080aefc43ed3be0d93babf13d",
+      "blockNumber": 54421012
+    },
+    "DueBackCampaigns": {
+      "address": "0x111f01A0ee61C7A9D779c2C9f9b91cadD7d5a0ec",
+      "transactionHash": "0x9099f0549246a8f85d91bcf7eaa5707855017e9dd1045219ace70849c0115aae",
+      "blockNumber": 54421018
+    }
+  }
+}
