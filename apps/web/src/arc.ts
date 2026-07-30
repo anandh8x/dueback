@@ -164,6 +164,10 @@ export function campaignExplorerUrl(address: Address): string {
   return `${arcTestnet.blockExplorers.default.url}/address/${address}`;
 }
 
+export function transactionExplorerUrl(hash: Hash): string {
+  return `${arcTestnet.blockExplorers.default.url}/tx/${hash}`;
+}
+
 export async function readLiveCampaign(input: string): Promise<LiveCampaign> {
   const campaignId = parseCampaignId(input);
   const campaignsAddress = campaignContractAddress();

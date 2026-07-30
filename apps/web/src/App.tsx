@@ -7,9 +7,20 @@ import {
   generateDistribution,
   organizationIdFor,
   parseAllocationCsv,
+  parseClaimPacketJson,
+  type ClaimPacket,
   type GeneratedDistribution,
 } from "@dueback/protocol";
-import { campaignExplorerUrl, readLiveCampaign, type LiveCampaign } from "./arc";
+import type { EIP1193Provider, Hash } from "viem";
+import {
+  campaignExplorerUrl,
+  inspectClaimPacket,
+  readLiveCampaign,
+  submitClaimPacket,
+  transactionExplorerUrl,
+  type ClaimReadiness,
+  type LiveCampaign,
+} from "./arc";
 
 type View = "home" | "verify" | "organize";
 
@@ -379,6 +390,7 @@ function WorkspaceHeader({ title, onClose }: { title: string; onClose: () => voi
 }
 
 function VerifyWorkspace({ onClose }: { onClose: () => void }) {
+  const [mode, setMode] = useState<"campaign" | "claim">("campaign");
   const [query, setQuery] = useState("");
   const [campaign, setCampaign] = useState<LiveCampaign | null>(null);
   const [demo, setDemo] = useState(false);
@@ -411,53 +423,197 @@ function VerifyWorkspace({ onClose }: { onClose: () => void }) {
           <span>{"{"}</span> Read-only · sourced from Arc <span>{"}"}</span>
         </p>
         <h1>Verify before you claim.</h1>
-        <form
-          className="verify-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void verify(query);
-          }}
-        >
-          <label htmlFor="campaign-search">Campaign ID or claim link</label>
-          <div>
-            <input
-              id="campaign-search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={sampleCampaignId}
-            />
-            <button type="submit" disabled={loading}>
-              {loading ? "Reading Arc..." : "Verify"}
-            </button>
-          </div>
-          <button className="demo-action" type="button" onClick={() => void verify("demo")}>
-            Try the clearly labeled demo campaign
+        <div className="workspace-tabs" aria-label="Verification mode">
+          <button
+            className={mode === "campaign" ? "active" : ""}
+            onClick={() => setMode("campaign")}
+            aria-pressed={mode === "campaign"}
+          >
+            Campaign state
           </button>
-        </form>
-        {error ? <p className="verify-error">{error}</p> : null}
-        {campaign || demo ? (
-          <div className="workspace-result">
-            <CampaignLedger campaign={campaign ?? undefined} />
-            <div className="claim-check">
-              <span className="check-ring">✓</span>
-              <p>{demo ? "Demo campaign loaded." : "Live campaign state loaded from Arc."}</p>
-              <small>
-                {demo
-                  ? "Illustrative data only. No blockchain record was queried."
-                  : "Funding, commitments, timing, and claim totals came directly from the configured contract."}
-              </small>
-            </div>
-          </div>
+          <button
+            className={mode === "claim" ? "active" : ""}
+            onClick={() => setMode("claim")}
+            aria-pressed={mode === "claim"}
+          >
+            Claim packet
+          </button>
+        </div>
+        {mode === "campaign" ? (
+          <>
+            <form
+              className="verify-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void verify(query);
+              }}
+            >
+              <label htmlFor="campaign-search">Campaign ID or claim link</label>
+              <div>
+                <input
+                  id="campaign-search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder={sampleCampaignId}
+                />
+                <button type="submit" disabled={loading}>
+                  {loading ? "Reading Arc..." : "Verify"}
+                </button>
+              </div>
+              <button className="demo-action" type="button" onClick={() => void verify("demo")}>
+                Try the clearly labeled demo campaign
+              </button>
+            </form>
+            {error ? <p className="verify-error">{error}</p> : null}
+            {campaign || demo ? (
+              <div className="workspace-result">
+                <CampaignLedger campaign={campaign ?? undefined} />
+                <div className="claim-check">
+                  <span className="check-ring">✓</span>
+                  <p>{demo ? "Demo campaign loaded." : "Live campaign state loaded from Arc."}</p>
+                  <small>
+                    {demo
+                      ? "Illustrative data only. No blockchain record was queried."
+                      : "Funding, commitments, timing, and claim totals came directly from the configured contract."}
+                  </small>
+                </div>
+              </div>
+            ) : (
+              <div className="empty-graph" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+                <p>Campaign state will appear here</p>
+              </div>
+            )}
+          </>
         ) : (
-          <div className="empty-graph" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-            <p>Campaign state will appear here</p>
-          </div>
+          <ClaimPacketPanel />
         )}
       </section>
     </main>
+  );
+}
+
+function ClaimPacketPanel() {
+  const [source, setSource] = useState("");
+  const [packet, setPacket] = useState<ClaimPacket | null>(null);
+  const [readiness, setReadiness] = useState<ClaimReadiness | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [transactionHash, setTransactionHash] = useState<Hash | null>(null);
+
+  const inspect = async () => {
+    setLoading(true);
+    setError(null);
+    setPacket(null);
+    setReadiness(null);
+    setTransactionHash(null);
+    try {
+      const parsed = parseClaimPacketJson(source);
+      setPacket(parsed);
+      setReadiness(await inspectClaimPacket(parsed));
+    } catch (cause) {
+      setError(readableError(cause));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const claim = async () => {
+    if (!packet) return;
+    const provider = (window as Window & { ethereum?: EIP1193Provider }).ethereum;
+    if (!provider) {
+      setError("Install or open an EVM wallet to submit this claim.");
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      setTransactionHash(await submitClaimPacket(packet, provider));
+    } catch (cause) {
+      setError(readableError(cause));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const ready =
+    readiness?.proofValid === true &&
+    readiness.alreadyClaimed === false &&
+    readiness.claimOpen === true;
+
+  return (
+    <div className="claim-packet-panel">
+      <div className="packet-input">
+        <label htmlFor="claim-packet">Claim packet JSON</label>
+        <textarea
+          id="claim-packet"
+          value={source}
+          onChange={(event) => setSource(event.target.value)}
+          placeholder={'{"schemaVersion":1,"campaignId":"0x...","index":0,...}'}
+        />
+        <p>
+          This packet contains a bearer secret. It stays in your browser and should not be shared
+          publicly.
+        </p>
+        <button className="button button-primary" onClick={() => void inspect()} disabled={loading}>
+          {loading ? "Checking Arc..." : "Check packet on Arc"} <Arrow />
+        </button>
+      </div>
+      <div className="packet-result">
+        {error ? <p className="verify-error">{error}</p> : null}
+        {readiness && packet ? (
+          <>
+            <p className="packet-campaign">{readiness.campaign.organizationName}</p>
+            <strong>{formatMoney(BigInt(packet.amount))} USDC</strong>
+            <dl>
+              <div>
+                <dt>Merkle proof</dt>
+                <dd className={readiness.proofValid ? "good" : "bad"}>
+                  {readiness.proofValid ? "Matches root" : "Invalid"}
+                </dd>
+              </div>
+              <div>
+                <dt>Claim status</dt>
+                <dd className={readiness.alreadyClaimed ? "bad" : "good"}>
+                  {readiness.alreadyClaimed ? "Already paid" : "Unclaimed"}
+                </dd>
+              </div>
+              <div>
+                <dt>Claim window</dt>
+                <dd className={readiness.claimOpen ? "good" : "bad"}>
+                  {readiness.claimOpen ? "Open" : "Closed"}
+                </dd>
+              </div>
+            </dl>
+            <button
+              className="button button-primary full"
+              onClick={() => void claim()}
+              disabled={!ready || submitting}
+            >
+              {submitting ? "Confirm in wallet..." : "Connect wallet and claim"}
+            </button>
+            {transactionHash ? (
+              <a
+                className="transaction-link"
+                href={transactionExplorerUrl(transactionHash)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Transaction submitted. View on ArcScan <Arrow />
+              </a>
+            ) : null}
+          </>
+        ) : (
+          <div className="packet-empty">
+            <span />
+            <p>Packet checks will appear here</p>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 

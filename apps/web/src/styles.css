@@ -876,8 +876,33 @@ button {
   text-transform: uppercase;
 }
 
+.workspace-tabs {
+  display: flex;
+  gap: 28px;
+  margin-top: 44px;
+  border-bottom: 1px solid var(--line);
+}
+
+.workspace-tabs button {
+  margin-bottom: -1px;
+  padding: 0 0 14px;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  color: #7f8bb8;
+  background: transparent;
+  font-family: "DM Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.workspace-tabs button.active {
+  border-color: var(--coral);
+  color: #fff;
+}
+
 .verify-form {
-  margin-top: 52px;
+  margin-top: 36px;
 }
 
 .verify-form label,
@@ -944,6 +969,138 @@ button {
   border: 1px solid rgba(255, 138, 116, 0.38);
   color: #ffb3a5;
   background: rgba(255, 112, 88, 0.08);
+}
+
+.claim-packet-panel {
+  display: grid;
+  grid-template-columns: 1fr 0.8fr;
+  gap: 28px;
+  margin-top: 36px;
+}
+
+.packet-input,
+.packet-result {
+  min-height: 430px;
+  border: 1px solid var(--line);
+  padding: 28px;
+  background: rgba(3, 7, 33, 0.42);
+}
+
+.packet-input label {
+  display: block;
+  margin-bottom: 12px;
+  color: #aeb8dc;
+  font-family: "DM Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.packet-input textarea {
+  width: 100%;
+  min-height: 250px;
+  resize: vertical;
+  border: 1px solid rgba(210, 220, 255, 0.4);
+  padding: 18px;
+  color: #fff;
+  outline: 0;
+  background: rgba(7, 12, 56, 0.48);
+  font-family: "DM Mono", monospace;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.packet-input textarea:focus {
+  border-color: #9aabff;
+  box-shadow: 0 0 0 3px rgba(113, 133, 255, 0.16);
+}
+
+.packet-input p {
+  color: #98a4ce;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.packet-result {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.packet-result .verify-error {
+  margin: 0;
+}
+
+.packet-campaign {
+  margin: 0;
+  color: #aeb8dc;
+  font-family: "DM Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.packet-result > strong {
+  margin: 16px 0 30px;
+  color: var(--mint);
+  font-size: 38px;
+  font-weight: 400;
+}
+
+.packet-result dl {
+  margin: 0;
+}
+
+.packet-result dl div {
+  display: flex;
+  justify-content: space-between;
+  padding: 15px 0;
+  border-top: 1px solid var(--line);
+}
+
+.packet-result dt {
+  color: #98a4ce;
+}
+
+.packet-result dd {
+  margin: 0;
+  font-family: "DM Mono", monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.packet-result dd.good {
+  color: var(--mint);
+}
+
+.packet-result dd.bad {
+  color: #ff9a88;
+}
+
+.packet-empty {
+  display: grid;
+  place-items: center;
+  gap: 18px;
+  color: #8e9ac6;
+  font-family: "DM Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.packet-empty span {
+  width: 72px;
+  height: 72px;
+  border: 1px solid #5f73d8;
+  border-radius: 50%;
+  box-shadow: 0 0 0 18px rgba(95, 115, 216, 0.08);
+}
+
+.transaction-link {
+  margin-top: 18px;
+  color: var(--mint);
+  font-size: 12px;
 }
 
 .workspace-result {
@@ -1176,7 +1333,8 @@ button {
   .trust-heading,
   .verification-section,
   .workspace-result,
-  .builder-grid {
+  .builder-grid,
+  .claim-packet-panel {
     grid-template-columns: 1fr;
   }
 
