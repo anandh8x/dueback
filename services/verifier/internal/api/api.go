@@ -24,6 +24,26 @@ func NewHandler(manager *verifier.Manager) http.Handler {
 	return securityHeaders(mux)
 }
 
+func AllowOrigin(next http.Handler, allowedOrigin string) http.Handler {
+	origin := strings.TrimSpace(allowedOrigin)
+	if origin == "" {
+		return next
+	}
+	return http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		if request.Header.Get("Origin") == origin {
+			response.Header().Set("Access-Control-Allow-Origin", origin)
+			response.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+			response.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+			response.Header().Set("Vary", "Origin")
+		}
+		if request.Method == http.MethodOptions {
+			response.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(response, request)
+	})
+}
+
 func (h *Handler) health(response http.ResponseWriter, _ *http.Request) {
 	writeJSON(response, http.StatusOK, map[string]string{"status": "ok"})
 }
