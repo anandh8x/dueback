@@ -89,6 +89,16 @@ describe("campaign identifiers and claim trees", () => {
     }
   });
 
+  it("uses fresh cryptographic randomness by default", () => {
+    const allocation = [{ reference: "A", amount: "1" }];
+    const first = generateDistribution(campaignId, allocation);
+    const second = generateDistribution(campaignId, allocation);
+
+    expect(first.claims[0]?.packet.claimId).not.toBe(second.claims[0]?.packet.claimId);
+    expect(first.claims[0]?.packet.secret).not.toBe(second.claims[0]?.packet.secret);
+    expect(first.merkleRoot).not.toBe(second.merkleRoot);
+  });
+
   it("rejects a changed amount, secret, proof, or campaign", () => {
     const distribution = generateDistribution(
       campaignId,

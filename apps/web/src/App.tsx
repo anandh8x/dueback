@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import {
   campaignIdFor,
   campaignReferenceFor,
-  createDeterministicRandomSource,
   formatArcAmount,
   generateDistribution,
   hashJson,
@@ -664,13 +663,7 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
       const organizationId = organizationIdFor(domain);
       const reference = campaignReferenceFor(campaignReference);
       const campaignId = campaignIdFor(organizationId, reference);
-      setDistribution(
-        generateDistribution(
-          campaignId,
-          parseAllocationCsv(csv),
-          createDeterministicRandomSource(),
-        ),
-      );
+      setDistribution(generateDistribution(campaignId, parseAllocationCsv(csv)));
       setError(null);
     } catch (cause) {
       setDistribution(null);
