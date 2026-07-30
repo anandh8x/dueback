@@ -19,7 +19,7 @@
     "format:check": "prettier --check .",
     "test": "pnpm -r --if-present test",
     "contracts:test": "forge test --root contracts",
-    "go:test": "cd services/verifier && go test ./...",
+    "go:test": "cd services/verifier && GOCACHE=${GOCACHE:-/tmp/dueback-go-cache} go test ./...",
     "test:browser": "playwright test",
     "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm contracts:test && pnpm go:test"
   },

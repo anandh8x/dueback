@@ -47,6 +47,27 @@ func TestHealthAndSecurityHeaders(t *testing.T) {
 	}
 }
 
+func TestCORSAllowsOnlyConfiguredOrigin(t *testing.T) {
+	handler := AllowOrigin(newTestHandler(), "https://dueback.example")
+
+	allowed := httptest.NewRecorder()
+	allowedRequest := httptest.NewRequest(http.MethodOptions, "/v1/challenges", nil)
+	allowedRequest.Header.Set("Origin", "https://dueback.example")
+	handler.ServeHTTP(allowed, allowedRequest)
+	if allowed.Code != http.StatusNoContent ||
+		allowed.Header().Get("Access-Control-Allow-Origin") != "https://dueback.example" {
+		t.Fatal("configured origin was not allowed")
+	}
+
+	rejected := httptest.NewRecorder()
+	rejectedRequest := httptest.NewRequest(http.MethodOptions, "/v1/challenges", nil)
+	rejectedRequest.Header.Set("Origin", "https://attacker.example")
+	handler.ServeHTTP(rejected, rejectedRequest)
+	if rejected.Header().Get("Access-Control-Allow-Origin") != "" {
+		t.Fatal("unconfigured origin was allowed")
+	}
+}
+
 func TestChallengeLifecycle(t *testing.T) {
 	resolver := &resolverStub{values: make(map[string][]string)}
 	manager := verifier.NewManager(resolver, signerStub{})
