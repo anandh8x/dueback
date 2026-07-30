@@ -139,13 +139,13 @@ export function campaignExplorerUrl(address: Address): string {
 }
 
 export async function readLiveCampaign(input: string): Promise<LiveCampaign> {
+  const campaignId = parseCampaignId(input);
   const campaignsAddress = campaignContractAddress();
   const registryAddress = organizationRegistryAddress();
   if (!campaignsAddress || !registryAddress) {
     throw new Error("Live Arc contracts are not configured in this build.");
   }
 
-  const campaignId = parseCampaignId(input);
   const client = createPublicClient({
     chain: arcTestnet,
     transport: http(),
