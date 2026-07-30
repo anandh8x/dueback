@@ -152,6 +152,11 @@ export function organizationRegistryAddress(): Address | null {
   return configured && isAddress(configured) ? getAddress(configured) : null;
 }
 
+export function featuredCampaignId(): Hex | null {
+  const configured = import.meta.env.VITE_FEATURED_CAMPAIGN_ID;
+  return configured ? parseCampaignId(configured) : null;
+}
+
 export function parseCampaignId(value: string): Hex {
   const match = value.trim().match(/0x[a-fA-F0-9]{64}/);
   if (!match || !isHex(match[0], { strict: true }) || match[0].length !== 66) {
