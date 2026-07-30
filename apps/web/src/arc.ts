@@ -241,18 +241,22 @@ export async function readLiveCampaign(input: string): Promise<LiveCampaign> {
     chain: arcTestnet,
     transport: http(),
   });
-  const campaign = await client.readContract({
-    address: campaignsAddress,
-    abi: dueBackCampaignsAbi,
-    functionName: "getCampaign",
-    args: [campaignId],
-  });
-  const organization = await client.readContract({
-    address: registryAddress,
-    abi: organizationRegistryAbi,
-    functionName: "getOrganization",
-    args: [campaign.organizationId],
-  });
+  const campaign = await withArcReadRetry(() =>
+    client.readContract({
+      address: campaignsAddress,
+      abi: dueBackCampaignsAbi,
+      functionName: "getCampaign",
+      args: [campaignId],
+    }),
+  );
+  const organization = await withArcReadRetry(() =>
+    client.readContract({
+      address: registryAddress,
+      abi: organizationRegistryAbi,
+      functionName: "getOrganization",
+      args: [campaign.organizationId],
+    }),
+  );
 
   return {
     campaignId,
@@ -279,12 +283,14 @@ export async function readLiveCampaign(input: string): Promise<LiveCampaign> {
 export async function inspectClaimPacket(packet: ClaimPacket): Promise<ClaimReadiness> {
   const campaign = await readLiveCampaign(packet.campaignId);
   const client = publicClient();
-  const alreadyClaimed = await client.readContract({
-    address: campaign.contractAddress,
-    abi: dueBackCampaignsAbi,
-    functionName: "isClaimed",
-    args: [packet.campaignId, BigInt(packet.index)],
-  });
+  const alreadyClaimed = await withArcReadRetry(() =>
+    client.readContract({
+      address: campaign.contractAddress,
+      abi: dueBackCampaignsAbi,
+      functionName: "isClaimed",
+      args: [packet.campaignId, BigInt(packet.index)],
+    }),
+  );
   const now = BigInt(Math.floor(Date.now() / 1000));
 
   return {
@@ -293,6 +299,25 @@ export async function inspectClaimPacket(packet: ClaimPacket): Promise<ClaimRead
     alreadyClaimed,
     claimOpen: now >= campaign.opensAt && now < campaign.closesAt && !campaign.reclaimed,
   };
+}
+
+export async function withArcReadRetry<T>(
+  operation: () => Promise<T>,
+  delays: readonly number[] = [300, 900],
+): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await operation();
+    } catch (cause) {
+      if (!isRateLimitError(cause) || attempt >= delays.length) throw cause;
+      await new Promise((resolve) => globalThis.setTimeout(resolve, delays[attempt]));
+    }
+  }
+}
+
+function isRateLimitError(cause: unknown): boolean {
+  if (!(cause instanceof Error)) return false;
+  return /request limit|rate limit|too many requests|status\s*429/i.test(cause.message);
 }
 
 export async function submitClaimPacket(

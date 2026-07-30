@@ -19,6 +19,10 @@ const contractErrors: ReadonlyArray<readonly [string, string]> = [
 export function readableError(cause: unknown): string {
   if (!(cause instanceof Error)) return "Something went wrong while contacting Arc.";
 
+  if (/request limit|rate limit|too many requests|status\s*429/i.test(cause.message)) {
+    return "Arc Testnet RPC is temporarily busy. Wait a moment and try again.";
+  }
+
   for (const [contractError, message] of contractErrors) {
     if (cause.message.includes(contractError)) return message;
   }

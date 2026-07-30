@@ -20,4 +20,10 @@ describe("readableError", () => {
   it("preserves useful non-contract errors", () => {
     expect(readableError(new Error("Wallet request rejected"))).toBe("Wallet request rejected");
   });
+
+  it("makes Arc RPC rate limits actionable", () => {
+    expect(readableError(new Error("request limit reached"))).toBe(
+      "Arc Testnet RPC is temporarily busy. Wait a moment and try again.",
+    );
+  });
 });
