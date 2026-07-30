@@ -14,6 +14,7 @@ import {
 import type { EIP1193Provider, Hash } from "viem";
 import {
   campaignExplorerUrl,
+  featuredCampaignId,
   inspectClaimPacket,
   readLiveCampaign,
   submitClaimPacket,
@@ -390,6 +391,7 @@ function WorkspaceHeader({ title, onClose }: { title: string; onClose: () => voi
 }
 
 function VerifyWorkspace({ onClose }: { onClose: () => void }) {
+  const featured = featuredCampaignId();
   const [mode, setMode] = useState<"campaign" | "claim">("campaign");
   const [query, setQuery] = useState("");
   const [campaign, setCampaign] = useState<LiveCampaign | null>(null);
@@ -460,9 +462,20 @@ function VerifyWorkspace({ onClose }: { onClose: () => void }) {
                   {loading ? "Reading Arc..." : "Verify"}
                 </button>
               </div>
-              <button className="demo-action" type="button" onClick={() => void verify("demo")}>
-                Try the clearly labeled demo campaign
-              </button>
+              <div className="verify-shortcuts">
+                {featured ? (
+                  <button
+                    className="live-action"
+                    type="button"
+                    onClick={() => void verify(featured)}
+                  >
+                    Load the real Arc smoke campaign
+                  </button>
+                ) : null}
+                <button className="demo-action" type="button" onClick={() => void verify("demo")}>
+                  Try the clearly labeled demo campaign
+                </button>
+              </div>
             </form>
             {error ? <p className="verify-error">{error}</p> : null}
             {campaign || demo ? (

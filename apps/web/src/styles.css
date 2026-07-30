@@ -950,8 +950,15 @@ button {
   opacity: 0.72;
 }
 
-.verify-form .demo-action {
+.verify-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
   margin-top: 14px;
+}
+
+.verify-form .demo-action,
+.verify-form .live-action {
   padding: 0;
   color: #b9c5ef;
   background: transparent;
@@ -961,6 +968,10 @@ button {
   letter-spacing: 0.04em;
   text-decoration: underline;
   text-underline-offset: 5px;
+}
+
+.verify-form .live-action {
+  color: var(--mint);
 }
 
 .verify-error {
