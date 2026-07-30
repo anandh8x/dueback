@@ -9,6 +9,7 @@ import {
   parseAllocationCsv,
   type GeneratedDistribution,
 } from "@dueback/protocol";
+import { campaignExplorerUrl, readLiveCampaign, type LiveCampaign } from "./arc";
 
 type View = "home" | "verify" | "organize";
 
@@ -250,38 +251,77 @@ function VerificationSection({ onOpen }: { onOpen: () => void }) {
   );
 }
 
-function CampaignLedger() {
+function CampaignLedger({ campaign }: { campaign?: LiveCampaign | undefined }) {
+  const total = campaign?.totalAmount ?? 125_000n * 10n ** 18n;
+  const claimed = campaign?.claimedAmount ?? 82_3146n * 10n ** 17n;
+  const reclaimed = campaign?.reclaimedAmount ?? 0n;
+  const remaining = total - claimed - reclaimed;
+  const progress = total === 0n ? 0 : Number((claimed * 10_000n) / total) / 100;
+  const now = BigInt(Math.floor(Date.now() / 1000));
+  const status = campaign
+    ? campaign.reclaimed
+      ? "Reconciled"
+      : now < campaign.opensAt
+        ? "Funded · opens soon"
+        : now >= campaign.closesAt
+          ? "Claims closed"
+          : "Fully funded · claims open"
+    : "Fully funded · claims open";
+
   return (
     <div className="campaign-ledger">
       <div className="ledger-topline">
         <span className="status-dot" />
-        Fully funded · claims open
+        {status}
       </div>
-      <h3>Spring membership refunds</h3>
-      <p>Community Refunds Foundation · communityrefunds.org</p>
+      <h3>
+        {campaign ? `${campaign.organizationName} payout campaign` : "Spring membership refunds"}
+      </h3>
+      <p>
+        {campaign
+          ? `${campaign.organizationName} · ${campaign.organizationDomain}`
+          : "Community Refunds Foundation · communityrefunds.org"}
+      </p>
       <div className="ledger-values">
         <div>
           <span>Total committed</span>
-          <b>$125,000.00</b>
+          <b>${formatMoney(total)}</b>
         </div>
         <div>
           <span>Total claimed</span>
-          <b>$82,314.60</b>
+          <b>${formatMoney(claimed)}</b>
         </div>
         <div>
           <span>Remaining</span>
-          <b>$42,685.40</b>
+          <b>${formatMoney(remaining)}</b>
         </div>
       </div>
       <div className="ledger-progress">
-        <i />
+        <i style={{ width: `${progress}%` }} />
       </div>
       <div className="ledger-code">
         <span>Immutable root</span>
         <code>
-          {sampleRoot.slice(0, 18)}...{sampleRoot.slice(-8)}
+          {(campaign?.merkleRoot ?? sampleRoot).slice(0, 18)}...
+          {(campaign?.merkleRoot ?? sampleRoot).slice(-8)}
         </code>
       </div>
+      {campaign ? (
+        <div className="live-details">
+          <span>
+            Recipients <b>{campaign.recipientCount.toLocaleString()}</b>
+          </span>
+          <span>
+            Claims paid <b>{campaign.claimedCount.toLocaleString()}</b>
+          </span>
+          <span>
+            Domain status <b>{campaign.organizationActive ? "Active" : "Inactive"}</b>
+          </span>
+          <a href={campaignExplorerUrl(campaign.contractAddress)} target="_blank" rel="noreferrer">
+            View contract on ArcScan <Arrow />
+          </a>
+        </div>
+      ) : null}
       <div className="proof-split">
         <div>
           <b>What this proves</b>
@@ -340,7 +380,28 @@ function WorkspaceHeader({ title, onClose }: { title: string; onClose: () => voi
 
 function VerifyWorkspace({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState("");
-  const [verified, setVerified] = useState(false);
+  const [campaign, setCampaign] = useState<LiveCampaign | null>(null);
+  const [demo, setDemo] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const verify = async (input: string) => {
+    setLoading(true);
+    setError(null);
+    setCampaign(null);
+    setDemo(false);
+    try {
+      if (input.trim().toLowerCase() === "demo") {
+        setDemo(true);
+      } else {
+        setCampaign(await readLiveCampaign(input));
+      }
+    } catch (cause) {
+      setError(readableError(cause));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <main className="workspace">
@@ -354,7 +415,7 @@ function VerifyWorkspace({ onClose }: { onClose: () => void }) {
           className="verify-form"
           onSubmit={(event) => {
             event.preventDefault();
-            setVerified(true);
+            void verify(query);
           }}
         >
           <label htmlFor="campaign-search">Campaign ID or claim link</label>
@@ -365,16 +426,26 @@ function VerifyWorkspace({ onClose }: { onClose: () => void }) {
               onChange={(event) => setQuery(event.target.value)}
               placeholder={sampleCampaignId}
             />
-            <button type="submit">Verify</button>
+            <button type="submit" disabled={loading}>
+              {loading ? "Reading Arc..." : "Verify"}
+            </button>
           </div>
+          <button className="demo-action" type="button" onClick={() => void verify("demo")}>
+            Try the clearly labeled demo campaign
+          </button>
         </form>
-        {verified ? (
+        {error ? <p className="verify-error">{error}</p> : null}
+        {campaign || demo ? (
           <div className="workspace-result">
-            <CampaignLedger />
+            <CampaignLedger campaign={campaign ?? undefined} />
             <div className="claim-check">
               <span className="check-ring">✓</span>
-              <p>Your campaign record checks out.</p>
-              <small>Contract state, funding, root, and claim totals were read from Arc.</small>
+              <p>{demo ? "Demo campaign loaded." : "Live campaign state loaded from Arc."}</p>
+              <small>
+                {demo
+                  ? "Illustrative data only. No blockchain record was queried."
+                  : "Funding, commitments, timing, and claim totals came directly from the configured contract."}
+              </small>
             </div>
           </div>
         ) : (
@@ -513,5 +584,13 @@ function maskContact(contact: string): string {
 function formatMoney(value: bigint): string {
   const formatted = formatArcAmount(value);
   const [whole, fraction = ""] = formatted.split(".");
-  return `${whole}.${fraction.padEnd(2, "0")}`;
+  return `${BigInt(whole ?? "0").toLocaleString("en-US")}.${fraction.padEnd(2, "0")}`;
+}
+
+function readableError(cause: unknown): string {
+  if (!(cause instanceof Error)) return "Could not read this campaign from Arc.";
+  if (cause.message.includes("CampaignNotFound") || cause.message.includes("execution reverted")) {
+    return "No DueBack campaign was found for that ID on the configured Arc contract.";
+  }
+  return cause.message;
 }
