@@ -65,4 +65,14 @@ test("builds allocation commitments locally", async ({ page }) => {
 
   await expect(page.getByText("3 recipients")).toBeVisible();
   await expect(page.getByText("523.00 USDC")).toBeVisible();
+
+  const publicDownload = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download public commitments" }).click();
+  await expect((await publicDownload).suggestedFilename()).toBe("dueback-public-commitments.json");
+
+  const privateDownload = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export private claim packets" }).click();
+  await expect((await privateDownload).suggestedFilename()).toBe(
+    "dueback-private-claim-packets.json",
+  );
 });
