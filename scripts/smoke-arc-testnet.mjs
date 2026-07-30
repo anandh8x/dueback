@@ -99,7 +99,7 @@ const policyHash = run("cast", ["keccak", `smoke-policy-${String(stamp)}`]);
 const metadataHash = run("cast", ["keccak", `smoke-metadata-${String(stamp)}`]);
 const noticeHash = run("cast", ["keccak", `smoke-notice-${String(stamp)}`]);
 const zeroHash = `0x${"0".repeat(64)}`;
-const opensAt = stamp + 20;
+const opensAt = (await latestBlockTimestamp()) + 20;
 const closesAt = opensAt + 120;
 const request = [
   organizationId,
@@ -238,9 +238,29 @@ function run(command, args) {
 }
 
 async function waitUntil(timestamp) {
-  while (Math.floor(Date.now() / 1000) < timestamp) {
-    await delay(500);
+  while ((await latestBlockTimestamp()) < timestamp) {
+    await delay(1_000);
   }
+}
+
+async function latestBlockTimestamp() {
+  const response = await globalThis.fetch(rpcUrl, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: "latest-block",
+      method: "eth_getBlockByNumber",
+      params: ["latest", false],
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(`Latest Arc block request failed with HTTP ${String(response.status)}`);
+  }
+  const payload = await response.json();
+  const timestamp = payload.result?.timestamp;
+  if (typeof timestamp !== "string") throw new Error("Latest Arc block has no timestamp");
+  return Number.parseInt(timestamp, 16);
 }
 
 function requireAddress(value, label) {
