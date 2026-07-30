@@ -25,11 +25,16 @@ export interface RuntimeConfig {
   chainId: number;
 }
 
-export function runtimeConfig(environment: NodeJS.ProcessEnv = process.env): RuntimeConfig {
-  const challengeSecret = environment.DUEBACK_CHALLENGE_SECRET?.trim() ?? "";
-  if (challengeSecret.length < 32) {
+export function challengeSecret(environment: NodeJS.ProcessEnv = process.env): string {
+  const secret = environment.DUEBACK_CHALLENGE_SECRET?.trim() ?? "";
+  if (secret.length < 32) {
     throw new Error("DUEBACK_CHALLENGE_SECRET must contain at least 32 characters");
   }
+  return secret;
+}
+
+export function runtimeConfig(environment: NodeJS.ProcessEnv = process.env): RuntimeConfig {
+  const secret = challengeSecret(environment);
   const privateKey = environment.DUEBACK_ATTESTOR_PRIVATE_KEY?.trim() ?? "";
   if (!/^0x[0-9a-fA-F]{64}$/.test(privateKey)) {
     throw new Error("DUEBACK_ATTESTOR_PRIVATE_KEY is not configured");
@@ -43,7 +48,7 @@ export function runtimeConfig(environment: NodeJS.ProcessEnv = process.env): Run
     throw new Error("DUEBACK_CHAIN_ID is invalid");
   }
   return {
-    challengeSecret,
+    challengeSecret: secret,
     attestorPrivateKey: privateKey as Hex,
     registryAddress: getAddress(registry),
     chainId,
@@ -67,7 +72,7 @@ export function normalizeAdmin(value: unknown): Address {
 export function createChallenge(
   domainInput: unknown,
   adminInput: unknown,
-  config: RuntimeConfig,
+  config: Pick<RuntimeConfig, "challengeSecret">,
   now = Math.floor(Date.now() / 1000),
 ): {
   id: string;
