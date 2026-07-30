@@ -1,13 +1,18 @@
 import {
+  createWalletClient,
   createPublicClient,
+  custom,
   defineChain,
   getAddress,
   http,
   isAddress,
   isHex,
   type Address,
+  type EIP1193Provider,
+  type Hash,
   type Hex,
 } from "viem";
+import { verifyClaimPacket, type ClaimPacket } from "@dueback/protocol";
 
 const defaultRpcUrl = "https://rpc.testnet.arc.network";
 const defaultExplorerUrl = "https://testnet.arcscan.app";
@@ -83,6 +88,20 @@ export const dueBackCampaignsAbi = [
     ],
     outputs: [{ name: "paid", type: "bool" }],
   },
+  {
+    type: "function",
+    name: "claim",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "campaignId", type: "bytes32" },
+      { name: "index", type: "uint256" },
+      { name: "claimId", type: "bytes32" },
+      { name: "amount", type: "uint256" },
+      { name: "secret", type: "bytes32" },
+      { name: "proof", type: "bytes32[]" },
+    ],
+    outputs: [],
+  },
 ] as const;
 
 export const organizationRegistryAbi = [
@@ -114,6 +133,13 @@ export interface LiveCampaign {
   organizationActive: boolean;
   domainVerifiedUntil: bigint;
   contractAddress: Address;
+}
+
+export interface ClaimReadiness {
+  campaign: LiveCampaign;
+  proofValid: boolean;
+  alreadyClaimed: boolean;
+  claimOpen: boolean;
 }
 
 export function campaignContractAddress(): Address | null {
@@ -183,4 +209,69 @@ export async function readLiveCampaign(input: string): Promise<LiveCampaign> {
     domainVerifiedUntil: organization.domainVerifiedUntil,
     contractAddress: campaignsAddress,
   };
+}
+
+export async function inspectClaimPacket(packet: ClaimPacket): Promise<ClaimReadiness> {
+  const campaign = await readLiveCampaign(packet.campaignId);
+  const client = publicClient();
+  const alreadyClaimed = await client.readContract({
+    address: campaign.contractAddress,
+    abi: dueBackCampaignsAbi,
+    functionName: "isClaimed",
+    args: [packet.campaignId, BigInt(packet.index)],
+  });
+  const now = BigInt(Math.floor(Date.now() / 1000));
+
+  return {
+    campaign,
+    proofValid: verifyClaimPacket(packet, campaign.merkleRoot),
+    alreadyClaimed,
+    claimOpen: now >= campaign.opensAt && now < campaign.closesAt && !campaign.reclaimed,
+  };
+}
+
+export async function submitClaimPacket(
+  packet: ClaimPacket,
+  provider: EIP1193Provider,
+): Promise<Hash> {
+  const readiness = await inspectClaimPacket(packet);
+  if (!readiness.proofValid) throw new Error("The claim packet does not match the campaign root.");
+  if (readiness.alreadyClaimed) throw new Error("This claim has already been paid.");
+  if (!readiness.claimOpen) throw new Error("This campaign is not accepting claims right now.");
+
+  const wallet = createWalletClient({
+    chain: arcTestnet,
+    transport: custom(provider),
+  });
+  try {
+    await wallet.switchChain({ id: arcTestnet.id });
+  } catch {
+    await wallet.addChain({ chain: arcTestnet });
+    await wallet.switchChain({ id: arcTestnet.id });
+  }
+  const [account] = await wallet.requestAddresses();
+  if (!account) throw new Error("No wallet account was selected.");
+
+  const { request } = await publicClient().simulateContract({
+    account,
+    address: readiness.campaign.contractAddress,
+    abi: dueBackCampaignsAbi,
+    functionName: "claim",
+    args: [
+      packet.campaignId,
+      BigInt(packet.index),
+      packet.claimId,
+      BigInt(packet.amount),
+      packet.secret,
+      packet.proof,
+    ],
+  });
+  return wallet.writeContract(request);
+}
+
+function publicClient() {
+  return createPublicClient({
+    chain: arcTestnet,
+    transport: http(),
+  });
 }
