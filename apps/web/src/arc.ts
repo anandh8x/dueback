@@ -133,6 +133,20 @@ export const organizationRegistryAbi = [
     inputs: [{ name: "organizationId", type: "bytes32" }],
     outputs: [{ name: "organization", type: "tuple", components: organizationComponents }],
   },
+  {
+    type: "function",
+    name: "registerOrganization",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "domain", type: "string" },
+      { name: "displayName", type: "string" },
+      { name: "reclaimAddress", type: "address" },
+      { name: "domainVerifiedUntil", type: "uint64" },
+      { name: "nonce", type: "bytes32" },
+      { name: "attestationSignature", type: "bytes" },
+    ],
+    outputs: [{ name: "organizationId", type: "bytes32" }],
+  },
 ] as const;
 
 export interface LiveCampaign {
@@ -175,6 +189,13 @@ export interface FundedCampaignRequest {
   opensAt: bigint;
   closesAt: bigint;
   recipientCount: number;
+}
+
+export interface OrganizationAttestation {
+  admin: Address;
+  validUntil: string;
+  nonce: Hex;
+  signature: Hex;
 }
 
 export function campaignContractAddress(): Address | null {
@@ -341,6 +362,43 @@ export async function submitFundedCampaign(
   return wallet.writeContract(request);
 }
 
+export async function submitOrganizationRegistration(
+  domain: string,
+  displayName: string,
+  attestation: OrganizationAttestation,
+  provider: EIP1193Provider,
+): Promise<Hash> {
+  const wallet = createWalletClient({
+    chain: arcTestnet,
+    transport: custom(provider),
+  });
+  try {
+    await wallet.switchChain({ id: arcTestnet.id });
+  } catch {
+    await wallet.addChain({ chain: arcTestnet });
+    await wallet.switchChain({ id: arcTestnet.id });
+  }
+  const [account] = await wallet.requestAddresses();
+  if (!account) throw new Error("No wallet account was selected.");
+  if (account.toLowerCase() !== attestation.admin.toLowerCase()) {
+    throw new Error("Connect the wallet that requested this domain attestation.");
+  }
+
+  const expiryMilliseconds = new Date(attestation.validUntil).getTime();
+  if (!Number.isFinite(expiryMilliseconds) || expiryMilliseconds <= 0) {
+    throw new Error("Domain attestation has an invalid expiry.");
+  }
+  const validUntil = BigInt(Math.floor(expiryMilliseconds / 1000));
+  const { request } = await publicClient().simulateContract({
+    account,
+    address: requireOrganizationRegistryAddress(),
+    abi: organizationRegistryAbi,
+    functionName: "registerOrganization",
+    args: [domain, displayName, account, validUntil, attestation.nonce, attestation.signature],
+  });
+  return wallet.writeContract(request);
+}
+
 function publicClient() {
   return createPublicClient({
     chain: arcTestnet,
@@ -350,6 +408,12 @@ function publicClient() {
 
 function requireCampaignContractAddress(): Address {
   const address = campaignContractAddress();
+  if (!address) throw new Error("Live Arc contracts are not configured in this build.");
+  return address;
+}
+
+function requireOrganizationRegistryAddress(): Address {
+  const address = organizationRegistryAddress();
   if (!address) throw new Error("Live Arc contracts are not configured in this build.");
   return address;
 }
