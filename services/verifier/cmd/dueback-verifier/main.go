@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -29,7 +30,14 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	manager := verifier.NewManager(net.DefaultResolver, signer)
+	manager, err := verifier.NewManagerWithOptions(net.DefaultResolver, signer, verifier.Options{
+		StorePath:     envOr("DUEBACK_CHALLENGE_STORE_PATH", ".dueback-data/challenges.json"),
+		MaxChallenges: envInt("DUEBACK_MAX_CHALLENGES", 10_000),
+		VerifyTimeout: time.Duration(envInt("DUEBACK_VERIFY_TIMEOUT_SECONDS", 20)) * time.Second,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
 	handler := api.AllowOrigin(
 		api.NewHandler(manager),
 		envOr("DUEBACK_VERIFIER_ALLOWED_ORIGIN", "http://localhost:5173"),
@@ -74,4 +82,16 @@ func envOr(name, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func envInt(name string, fallback int) int {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		log.Fatalf("%s must be a positive integer", name)
+	}
+	return parsed
 }

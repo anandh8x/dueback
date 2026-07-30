@@ -3,8 +3,11 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"net"
 	"net/http"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/anandh8x/dueback/services/verifier/internal/verifier"
 )
@@ -13,10 +16,22 @@ const maxRequestBytes = 16 * 1024
 
 type Handler struct {
 	manager *verifier.Manager
+	limiter *rateLimiter
 }
 
 func NewHandler(manager *verifier.Manager) http.Handler {
-	handler := &Handler{manager: manager}
+	return NewHandlerWithRateLimit(manager, 10, time.Minute)
+}
+
+func NewHandlerWithRateLimit(
+	manager *verifier.Manager,
+	maxRequests int,
+	window time.Duration,
+) http.Handler {
+	handler := &Handler{
+		manager: manager,
+		limiter: newRateLimiter(maxRequests, window),
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", handler.health)
 	mux.HandleFunc("POST /v1/challenges", handler.createChallenge)
@@ -49,6 +64,11 @@ func (h *Handler) health(response http.ResponseWriter, _ *http.Request) {
 }
 
 func (h *Handler) createChallenge(response http.ResponseWriter, request *http.Request) {
+	if !h.limiter.allow(clientIP(request), time.Now()) {
+		response.Header().Set("Retry-After", "60")
+		writeError(response, http.StatusTooManyRequests, "too many verification requests")
+		return
+	}
 	var input struct {
 		Domain string `json:"domain"`
 		Admin  string `json:"admin"`
@@ -63,6 +83,60 @@ func (h *Handler) createChallenge(response http.ResponseWriter, request *http.Re
 		return
 	}
 	writeJSON(response, http.StatusCreated, challenge)
+}
+
+type rateEntry struct {
+	start time.Time
+	count int
+}
+
+type rateLimiter struct {
+	mu          sync.Mutex
+	entries     map[string]rateEntry
+	maxRequests int
+	window      time.Duration
+}
+
+func newRateLimiter(maxRequests int, window time.Duration) *rateLimiter {
+	if maxRequests <= 0 {
+		maxRequests = 10
+	}
+	if window <= 0 {
+		window = time.Minute
+	}
+	return &rateLimiter{entries: make(map[string]rateEntry), maxRequests: maxRequests, window: window}
+}
+
+func (limiter *rateLimiter) allow(key string, now time.Time) bool {
+	limiter.mu.Lock()
+	defer limiter.mu.Unlock()
+	for existingKey, existing := range limiter.entries {
+		if now.Sub(existing.start) >= limiter.window {
+			delete(limiter.entries, existingKey)
+		}
+	}
+	entry := limiter.entries[key]
+	if entry.start.IsZero() || now.Sub(entry.start) >= limiter.window {
+		if len(limiter.entries) >= 10_000 {
+			return false
+		}
+		limiter.entries[key] = rateEntry{start: now, count: 1}
+		return true
+	}
+	if entry.count >= limiter.maxRequests {
+		return false
+	}
+	entry.count++
+	limiter.entries[key] = entry
+	return true
+}
+
+func clientIP(request *http.Request) string {
+	host, _, err := net.SplitHostPort(request.RemoteAddr)
+	if err == nil {
+		return host
+	}
+	return request.RemoteAddr
 }
 
 func (h *Handler) verifyChallenge(response http.ResponseWriter, request *http.Request) {

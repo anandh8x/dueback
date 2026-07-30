@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/anandh8x/dueback/services/verifier/internal/verifier"
 )
@@ -133,6 +134,28 @@ func TestCreateRejectsUnknownAndInvalidFields(t *testing.T) {
 		)
 		if response.Code != http.StatusBadRequest {
 			t.Fatalf("accepted invalid body %q with status %d", body, response.Code)
+		}
+	}
+}
+
+func TestCreateRateLimit(t *testing.T) {
+	handler := NewHandlerWithRateLimit(
+		verifier.NewManager(&resolverStub{values: make(map[string][]string)}, signerStub{}),
+		2,
+		time.Minute,
+	)
+	body := `{"domain":"refunds.example","admin":"0x99066fBc97557490fA794F750630bb41733D1004"}`
+	for attempt := 1; attempt <= 3; attempt++ {
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(
+			response,
+			httptest.NewRequest(http.MethodPost, "/v1/challenges", bytes.NewBufferString(body)),
+		)
+		if attempt < 3 && response.Code != http.StatusCreated {
+			t.Fatalf("attempt %d unexpectedly returned %d", attempt, response.Code)
+		}
+		if attempt == 3 && response.Code != http.StatusTooManyRequests {
+			t.Fatalf("rate-limited attempt returned %d", response.Code)
 		}
 	}
 }
