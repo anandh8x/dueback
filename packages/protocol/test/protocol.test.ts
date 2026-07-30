@@ -12,6 +12,7 @@ import {
   organizationIdFor,
   parseAllocationCsv,
   parseArcAmount,
+  parseClaimPacketJson,
   validateClaimPacket,
   verifyClaimPacket,
   type ClaimPacket,
@@ -143,6 +144,31 @@ describe("campaign identifiers and claim trees", () => {
 });
 
 describe("packet and manifest primitives", () => {
+  it("parses a generated claim packet from JSON", () => {
+    const campaignId = campaignIdFor(
+      organizationIdFor("refunds.example"),
+      campaignReferenceFor("packet-json"),
+    );
+    const distribution = generateDistribution(
+      campaignId,
+      [{ reference: "A", amount: "4.25" }],
+      createDeterministicRandomSource(30n),
+    );
+    const packet = distribution.claims[0]?.packet;
+    if (!packet) throw new Error("missing test packet");
+
+    expect(parseClaimPacketJson(JSON.stringify(packet))).toEqual(packet);
+  });
+
+  it("rejects malformed, oversized, and structurally invalid packet JSON", () => {
+    expect(() => parseClaimPacketJson("{")).toThrow("not valid JSON");
+    expect(() => parseClaimPacketJson("[]")).toThrow("JSON object");
+    expect(() => parseClaimPacketJson(JSON.stringify({ schemaVersion: 1 }))).toThrow(
+      "invalid or missing fields",
+    );
+    expect(() => parseClaimPacketJson("x".repeat(100_001))).toThrow("100,000");
+  });
+
   it("rejects malformed packet fields", () => {
     const malformed = {
       schemaVersion: 1,

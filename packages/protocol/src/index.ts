@@ -278,6 +278,48 @@ export function validateClaimPacket(packet: ClaimPacket): void {
   for (const sibling of packet.proof) assertBytes32(sibling, "proof sibling");
 }
 
+export function parseClaimPacketJson(source: string): ClaimPacket {
+  if (source.length === 0 || source.length > 100_000) {
+    throw new Error("Claim packet JSON must be between 1 and 100,000 characters");
+  }
+
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(source);
+  } catch {
+    throw new Error("Claim packet is not valid JSON");
+  }
+  if (decoded === null || typeof decoded !== "object" || Array.isArray(decoded)) {
+    throw new Error("Claim packet must be a JSON object");
+  }
+
+  const record = decoded as Record<string, unknown>;
+  if (
+    record.schemaVersion !== CLAIM_PACKET_SCHEMA_VERSION ||
+    typeof record.campaignId !== "string" ||
+    typeof record.index !== "number" ||
+    typeof record.claimId !== "string" ||
+    typeof record.amount !== "string" ||
+    typeof record.secret !== "string" ||
+    !Array.isArray(record.proof) ||
+    !record.proof.every((entry) => typeof entry === "string")
+  ) {
+    throw new Error("Claim packet has invalid or missing fields");
+  }
+
+  const packet: ClaimPacket = {
+    schemaVersion: CLAIM_PACKET_SCHEMA_VERSION,
+    campaignId: record.campaignId as Hex,
+    index: record.index,
+    claimId: record.claimId as Hex,
+    amount: record.amount,
+    secret: record.secret as Hex,
+    proof: record.proof as Hex[],
+  };
+  validateClaimPacket(packet);
+  return packet;
+}
+
 export function normalizeAddress(value: string): Address {
   if (!isAddress(value)) throw new Error("Invalid address");
   return getAddress(value);
