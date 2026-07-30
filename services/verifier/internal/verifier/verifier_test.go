@@ -3,6 +3,7 @@ package verifier
 import (
 	"context"
 	"errors"
+	"os"
 	"testing"
 	"time"
 )
@@ -100,6 +101,52 @@ func TestVerifyRejectsExpiredChallenge(t *testing.T) {
 
 	if _, err := manager.Verify(context.Background(), challenge.ID); !errors.Is(err, ErrChallengeExpired) {
 		t.Fatalf("expected expiry, received %v", err)
+	}
+}
+
+func TestManagerEnforcesCapacity(t *testing.T) {
+	manager, err := NewManagerWithOptions(&fakeResolver{}, &fakeSigner{}, Options{MaxChallenges: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := manager.Create("one.example", "0x99066fBc97557490fA794F750630bb41733D1004"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := manager.Create("two.example", "0x99066fBc97557490fA794F750630bb41733D1004"); !errors.Is(err, ErrChallengeLimit) {
+		t.Fatalf("expected capacity error, received %v", err)
+	}
+}
+
+func TestManagerPersistsReplayProtection(t *testing.T) {
+	storePath := t.TempDir() + "/challenges.json"
+	resolver := &fakeResolver{values: make(map[string][]string)}
+	signer := &fakeSigner{}
+	manager, err := NewManagerWithOptions(resolver, signer, Options{StorePath: storePath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	challenge, err := manager.Create("refunds.example", "0x99066fBc97557490fA794F750630bb41733D1004")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolver.values[challenge.DNSName] = []string{challenge.DNSValue}
+	if _, err := manager.Verify(context.Background(), challenge.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	restarted, err := NewManagerWithOptions(resolver, signer, Options{StorePath: storePath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := restarted.Verify(context.Background(), challenge.ID); !errors.Is(err, ErrChallengeUsed) {
+		t.Fatalf("expected persisted replay protection, received %v", err)
+	}
+	info, err := os.Stat(storePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("challenge store mode is %o", info.Mode().Perm())
 	}
 }
 
