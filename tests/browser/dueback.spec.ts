@@ -60,6 +60,13 @@ test("builds allocation commitments locally", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Prepare the private allocation." }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Verify the domain before funding." }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Connect wallet and request DNS challenge" }).click();
+  await expect(
+    page.getByText("Install or open an EVM wallet to verify an organization."),
+  ).toBeVisible();
   await expect(page.getByText("3 rows")).toBeVisible();
   await page.getByRole("button", { name: "Generate commitments" }).click();
 
