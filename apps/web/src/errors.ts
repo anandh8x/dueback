@@ -23,6 +23,10 @@ export function readableError(cause: unknown): string {
     return "Arc Testnet RPC is temporarily busy. Wait a moment and try again.";
   }
 
+  if (/networkerror|failed to fetch|network request failed/i.test(cause.message)) {
+    return "Could not reach the domain verifier. Check that it is running and try again.";
+  }
+
   for (const [contractError, message] of contractErrors) {
     if (cause.message.includes(contractError)) return message;
   }

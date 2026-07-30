@@ -26,4 +26,10 @@ describe("readableError", () => {
       "Arc Testnet RPC is temporarily busy. Wait a moment and try again.",
     );
   });
+
+  it("makes verifier connection failures actionable", () => {
+    expect(readableError(new Error("NetworkError when attempting to fetch resource."))).toBe(
+      "Could not reach the domain verifier. Check that it is running and try again.",
+    );
+  });
 });

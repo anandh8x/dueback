@@ -659,6 +659,7 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
   const [domainChallenge, setDomainChallenge] = useState<DomainChallenge | null>(null);
   const [domainAttestation, setDomainAttestation] = useState<OrganizationAttestation | null>(null);
   const [verificationBusy, setVerificationBusy] = useState(false);
+  const [verificationError, setVerificationError] = useState<string | null>(null);
   const [registrationTransaction, setRegistrationTransaction] = useState<Hash | null>(null);
   const preview = useMemo(() => {
     try {
@@ -735,11 +736,11 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
   const startDomainVerification = async () => {
     const provider = (window as Window & { ethereum?: EIP1193Provider }).ethereum;
     if (!provider) {
-      setError("Install or open an EVM wallet to verify an organization.");
+      setVerificationError("Install or open an EVM wallet to verify an organization.");
       return;
     }
     setVerificationBusy(true);
-    setError(null);
+    setVerificationError(null);
     setDomainChallenge(null);
     setDomainAttestation(null);
     setRegistrationTransaction(null);
@@ -750,7 +751,7 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
       invalidate();
       setDomainChallenge(challenge);
     } catch (cause) {
-      setError(readableError(cause));
+      setVerificationError(readableError(cause));
     } finally {
       setVerificationBusy(false);
     }
@@ -759,11 +760,11 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
   const checkDomainVerification = async () => {
     if (!domainChallenge) return;
     setVerificationBusy(true);
-    setError(null);
+    setVerificationError(null);
     try {
       setDomainAttestation(await verifyDomainChallenge(domainChallenge.id));
     } catch (cause) {
-      setError(readableError(cause));
+      setVerificationError(readableError(cause));
     } finally {
       setVerificationBusy(false);
     }
@@ -773,11 +774,11 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
     if (!domainAttestation || !domainChallenge) return;
     const provider = (window as Window & { ethereum?: EIP1193Provider }).ethereum;
     if (!provider) {
-      setError("Install or open the wallet that requested this attestation.");
+      setVerificationError("Install or open the wallet that requested this attestation.");
       return;
     }
     setVerificationBusy(true);
-    setError(null);
+    setVerificationError(null);
     try {
       setRegistrationTransaction(
         await submitOrganizationRegistration(
@@ -788,7 +789,7 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
         ),
       );
     } catch (cause) {
-      setError(readableError(cause));
+      setVerificationError(readableError(cause));
     } finally {
       setVerificationBusy(false);
     }
@@ -920,6 +921,7 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
                 ) : null}
               </>
             )}
+            {verificationError ? <p className="form-error">{verificationError}</p> : null}
           </div>
         </div>
         <div className="campaign-details">
@@ -941,6 +943,7 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
                 setDomain(event.target.value);
                 setDomainChallenge(null);
                 setDomainAttestation(null);
+                setVerificationError(null);
                 setRegistrationTransaction(null);
                 invalidate();
               }}
