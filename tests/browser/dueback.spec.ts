@@ -71,14 +71,14 @@ test("builds allocation commitments locally", async ({ page }) => {
   await page.getByRole("button", { name: "Generate commitments" }).click();
 
   await expect(page.getByText("3 recipients")).toBeVisible();
-  await expect(page.getByText("523.00 USDC", { exact: true })).toBeVisible();
+  await expect(page.getByText("0.006 USDC", { exact: true })).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Connect wallet and fund 523.00 USDC" }),
+    page.getByRole("button", { name: "Connect wallet and fund 0.006 USDC" }),
   ).toBeVisible();
 
   const publicDownload = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download public commitments" }).click();
-  expect((await publicDownload).suggestedFilename()).toBe("dueback-public-commitments.json");
+  expect((await publicDownload).suggestedFilename()).toBe("dueback-public-campaign-manifest.json");
 
   const privateDownload = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export private claim packets" }).click();
@@ -87,6 +87,6 @@ test("builds allocation commitments locally", async ({ page }) => {
   await page.getByLabel("Organization domain").fill("changed.example");
   await expect(page.getByText("3 recipients")).not.toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Connect wallet and fund 523.00 USDC" }),
+    page.getByRole("button", { name: "Connect wallet and fund 0.006 USDC" }),
   ).not.toBeVisible();
 });

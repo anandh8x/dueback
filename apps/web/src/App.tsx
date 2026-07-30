@@ -13,6 +13,8 @@ import {
 } from "@dueback/protocol";
 import type { EIP1193Provider, Hash } from "viem";
 import {
+  arcTestnet,
+  campaignContractAddress,
   campaignExplorerUrl,
   featuredCampaignId,
   inspectClaimPacket,
@@ -23,6 +25,7 @@ import {
   submitOrganizationRegistration,
   transactionExplorerUrl,
   type ClaimReadiness,
+  type FundedCampaignRequest,
   type LiveCampaign,
   type OrganizationAttestation,
 } from "./arc";
@@ -34,9 +37,15 @@ type View = "home" | "verify" | "organize";
 const sampleCampaignId = `0x${"9f3a".padEnd(64, "7b2c")}`;
 const sampleRoot = `0x${"7b14".padEnd(64, "6f2d")}`;
 const sampleCsv = `reference,amount,contact
-REF-0001,196.40,alex@example.com
-REF-0002,85.00,jules@example.com
-REF-0003,241.60,sam@example.com`;
+SAMPLE-001,0.001,alex@example.com
+SAMPLE-002,0.002,jules@example.com
+SAMPLE-003,0.003,sam@example.com`;
+
+interface PreparedCampaign {
+  distribution: GeneratedDistribution;
+  request: FundedCampaignRequest;
+  publicManifest: Record<string, unknown>;
+}
 
 export function App() {
   const [view, setView] = useState<View>("home");
@@ -637,13 +646,13 @@ function ClaimPacketPanel() {
 }
 
 function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
-  const [domain, setDomain] = useState("communityrefunds.org");
-  const [displayName, setDisplayName] = useState("Community Refunds Foundation");
-  const [campaignReference, setCampaignReference] = useState("spring-membership-refunds");
+  const [domain, setDomain] = useState("your-company.example");
+  const [displayName, setDisplayName] = useState("Your organization");
+  const [campaignReference, setCampaignReference] = useState("refund-2026-001");
   const [policy, setPolicy] = useState("Recipients listed in the approved refund allocation.");
   const [notice, setNotice] = useState("Claims remain open for 30 days after funding.");
   const [csv, setCsv] = useState(sampleCsv);
-  const [distribution, setDistribution] = useState<GeneratedDistribution | null>(null);
+  const [preparedCampaign, setPreparedCampaign] = useState<PreparedCampaign | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [funding, setFunding] = useState(false);
   const [fundingTransaction, setFundingTransaction] = useState<Hash | null>(null);
@@ -664,10 +673,61 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
       const organizationId = organizationIdFor(domain);
       const reference = campaignReferenceFor(campaignReference);
       const campaignId = campaignIdFor(organizationId, reference);
-      setDistribution(generateDistribution(campaignId, parseAllocationCsv(csv)));
+      const distribution = generateDistribution(campaignId, parseAllocationCsv(csv));
+      const policyDocument = { policy };
+      const noticeDocument = { notice };
+      const metadata = {
+        schemaVersion: 1,
+        campaignReference,
+        recipientCount: distribution.recipientCount,
+      };
+      const now = BigInt(Math.floor(Date.now() / 1000));
+      const request: FundedCampaignRequest = {
+        organizationId,
+        campaignReference: reference,
+        merkleRoot: distribution.merkleRoot,
+        policyHash: hashJson(policyDocument),
+        metadataHash: hashJson(metadata),
+        noticeHash: hashJson(noticeDocument),
+        supersedesCampaignId: `0x${"0".repeat(64)}`,
+        totalAmount: distribution.totalAmount,
+        opensAt: now + 3_600n,
+        closesAt: now + 30n * 86_400n,
+        recipientCount: distribution.recipientCount,
+      };
+      setPreparedCampaign({
+        distribution,
+        request,
+        publicManifest: {
+          schemaVersion: 1,
+          network: arcTestnet.name,
+          chainId: arcTestnet.id,
+          contractAddress: campaignContractAddress(),
+          organizationDomain: domain.trim().toLowerCase().replace(/\.$/, ""),
+          organizationId,
+          organizationDisplayName: displayName,
+          campaignReference,
+          campaignReferenceHash: reference,
+          campaignId,
+          merkleRoot: distribution.merkleRoot,
+          totalAmount: distribution.totalAmount.toString(),
+          recipientCount: distribution.recipientCount,
+          policyDocument,
+          policyHash: request.policyHash,
+          noticeDocument,
+          noticeHash: request.noticeHash,
+          metadata,
+          metadataHash: request.metadataHash,
+          supersedesCampaignId: request.supersedesCampaignId,
+          opensAt: request.opensAt.toString(),
+          opensAtIso: new Date(Number(request.opensAt) * 1000).toISOString(),
+          closesAt: request.closesAt.toString(),
+          closesAtIso: new Date(Number(request.closesAt) * 1000).toISOString(),
+        },
+      });
       setError(null);
     } catch (cause) {
-      setDistribution(null);
+      setPreparedCampaign(null);
       setError(cause instanceof Error ? cause.message : "Could not validate allocation");
     }
   };
@@ -687,6 +747,7 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
       const admin = await selectedWalletAddress(provider);
       const challenge = await createDomainChallenge(domain, admin);
       setDomain(challenge.domain);
+      invalidate();
       setDomainChallenge(challenge);
     } catch (cause) {
       setError(readableError(cause));
@@ -734,7 +795,7 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
   };
 
   const fund = async () => {
-    if (!distribution) return;
+    if (!preparedCampaign) return;
     const provider = (window as Window & { ethereum?: EIP1193Provider }).ethereum;
     if (!provider) {
       setError("Install or open an EVM wallet to fund this campaign.");
@@ -744,34 +805,18 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
     setError(null);
     setFundingTransaction(null);
     try {
-      const organizationId = organizationIdFor(domain);
-      const reference = campaignReferenceFor(campaignReference);
-      if (campaignIdFor(organizationId, reference) !== distribution.campaignId) {
+      if (BigInt(Math.floor(Date.now() / 1000)) >= preparedCampaign.request.opensAt) {
+        throw new Error("The prepared opening time has passed. Generate the commitments again.");
+      }
+      if (
+        campaignIdFor(
+          preparedCampaign.request.organizationId,
+          preparedCampaign.request.campaignReference,
+        ) !== preparedCampaign.distribution.campaignId
+      ) {
         throw new Error("Campaign details changed. Generate the commitments again.");
       }
-      const now = BigInt(Math.floor(Date.now() / 1000));
-      setFundingTransaction(
-        await submitFundedCampaign(
-          {
-            organizationId,
-            campaignReference: reference,
-            merkleRoot: distribution.merkleRoot,
-            policyHash: hashJson({ policy }),
-            metadataHash: hashJson({
-              schemaVersion: 1,
-              campaignReference,
-              recipientCount: distribution.recipientCount,
-            }),
-            noticeHash: hashJson({ notice }),
-            supersedesCampaignId: `0x${"0".repeat(64)}`,
-            totalAmount: distribution.totalAmount,
-            opensAt: now + 300n,
-            closesAt: now + 30n * 86_400n,
-            recipientCount: distribution.recipientCount,
-          },
-          provider,
-        ),
-      );
+      setFundingTransaction(await submitFundedCampaign(preparedCampaign.request, provider));
     } catch (cause) {
       setError(readableError(cause));
     } finally {
@@ -780,7 +825,7 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
   };
 
   const invalidate = () => {
-    setDistribution(null);
+    setPreparedCampaign(null);
     setFundingTransaction(null);
     setError(null);
   };
@@ -880,7 +925,13 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
         <div className="campaign-details">
           <label>
             Organization name
-            <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
+            <input
+              value={displayName}
+              onChange={(event) => {
+                setDisplayName(event.target.value);
+                invalidate();
+              }}
+            />
           </label>
           <label>
             Organization domain
@@ -907,16 +958,28 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
           </label>
           <label>
             Eligibility policy
-            <input value={policy} onChange={(event) => setPolicy(event.target.value)} />
+            <input
+              value={policy}
+              onChange={(event) => {
+                setPolicy(event.target.value);
+                invalidate();
+              }}
+            />
           </label>
           <label>
             Recipient notice
-            <input value={notice} onChange={(event) => setNotice(event.target.value)} />
+            <input
+              value={notice}
+              onChange={(event) => {
+                setNotice(event.target.value);
+                invalidate();
+              }}
+            />
           </label>
         </div>
         <div className="builder-grid">
           <div className="csv-editor">
-            <label htmlFor="allocation">Allocation CSV</label>
+            <label htmlFor="allocation">Allocation CSV · sample testnet values</label>
             <textarea
               id="allocation"
               value={csv}
@@ -956,23 +1019,20 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
                 ))}
               </tbody>
             </table>
-            {distribution ? (
+            {preparedCampaign ? (
               <>
                 <div className="distribution-summary">
-                  <span>{distribution.recipientCount} recipients</span>
-                  <strong>{formatMoney(distribution.totalAmount)} USDC</strong>
-                  <code>{distribution.merkleRoot.slice(0, 20)}...</code>
+                  <span>{preparedCampaign.distribution.recipientCount} recipients</span>
+                  <strong>{formatMoney(preparedCampaign.distribution.totalAmount)} USDC</strong>
+                  <code>{preparedCampaign.distribution.merkleRoot.slice(0, 20)}...</code>
                 </div>
                 <div className="export-actions">
                   <button
                     onClick={() =>
-                      downloadJson("dueback-public-commitments.json", {
-                        schemaVersion: 1,
-                        campaignId: distribution.campaignId,
-                        merkleRoot: distribution.merkleRoot,
-                        totalAmount: distribution.totalAmount.toString(),
-                        recipientCount: distribution.recipientCount,
-                      })
+                      downloadJson(
+                        "dueback-public-campaign-manifest.json",
+                        preparedCampaign.publicManifest,
+                      )
                     }
                   >
                     Download public commitments
@@ -981,8 +1041,8 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
                     onClick={() =>
                       downloadJson("dueback-private-claim-packets.json", {
                         schemaVersion: 1,
-                        campaignId: distribution.campaignId,
-                        claims: distribution.claims,
+                        campaignId: preparedCampaign.distribution.campaignId,
+                        claims: preparedCampaign.distribution.claims,
                       })
                     }
                   >
@@ -1001,7 +1061,9 @@ function OrganizerWorkspace({ onClose }: { onClose: () => void }) {
                   >
                     {funding
                       ? "Confirm funding in wallet..."
-                      : `Connect wallet and fund ${formatMoney(distribution.totalAmount)} USDC`}
+                      : `Connect wallet and fund ${formatMoney(
+                          preparedCampaign.distribution.totalAmount,
+                        )} USDC`}
                   </button>
                   {fundingTransaction ? (
                     <a
