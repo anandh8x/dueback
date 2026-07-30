@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "network": "Arc Testnet",
+  "chainId": 5042002,
+  "checkedAt": "2026-07-30T13:12:13.906Z",
+  "contracts": {
+    "OrganizationRegistry": "0x5028C830C3260fE5604B7F39eB118a1F3dBe34f5",
+    "DueBackCampaigns": "0x111f01A0ee61C7A9D779c2C9f9b91cadD7d5a0ec"
+  },
+  "organization": {
+    "domain": "smoke-1785417096.dueback.test",
+    "organizationId": "0xa86b85f7ba8457d4e15af36a84c64268f355d582a92b243200cb627e76c416f4",
+    "registrationTransaction": "0x28beb1bb7706236fdcbf63f8835015cc457a29b1013c137889372898e8c62cb0",
+    "attestationMode": "CONFIGURED_ATTESTOR_SYNTHETIC_DOMAIN"
+  },
+  "campaign": {
+    "campaignId": "0x8dfffaf7881664582784a2186d40cfe87cd7a7114833096cbe3e0f022b3edc11",
+    "merkleRoot": "0xbd52660fbf90f9f875b97e9c1d018ea04b631485f791cefb428692d1325011d3",
+    "amountWei": "100000000000000",
+    "recipientCount": 1,
+    "createTransaction": "0x9fb98ffb1f02650062c30e2a28609efde5d39cb1896bbac66c2bbdcd7a4fce52",
+    "opensAt": 1785417124,
+    "closesAt": 1785417244
+  },
+  "claim": {
+    "claimId": "0xaf0e729f0e90340c0b0b9c6e52299aa2c549515c8b1a9ba705205545ca8c5eef",
+    "transaction": "0xe60b0dde149fb667fd913e209c5934a2621b23b151b5578706a633e3dee1e592",
+    "claimed": true,
+    "duplicateBlocked": true
+  },
+  "publicStateNotice": "Wallet addresses, amounts, timing, and settlement data are public on Arc."
+}
